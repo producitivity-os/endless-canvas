@@ -287,3 +287,53 @@ export class CanvasEngine {
     target.addChild(label);
   }
 }
+export function distanceToSegment(
+  point: Point,
+  start: Point,
+  end: Point,
+): number {
+  const dx =
+    end.x - start.x;
+
+  const dy =
+    end.y - start.y;
+
+  const lengthSquared =
+    dx * dx +
+    dy * dy;
+
+  if (lengthSquared === 0) {
+    return Math.hypot(
+      point.x - start.x,
+      point.y - start.y,
+    );
+  }
+
+  const t =
+    Math.max(
+      0,
+      Math.min(
+        1,
+        (
+          (point.x - start.x) *
+          dx +
+          (point.y - start.y) *
+          dy
+        ) /
+        lengthSquared,
+      ),
+    );
+
+  const closestX =
+    start.x +
+    t * dx;
+
+  const closestY =
+    start.y +
+    t * dy;
+
+  return Math.hypot(
+    point.x - closestX,
+    point.y - closestY,
+  );
+}

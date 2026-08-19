@@ -1,4 +1,4 @@
-import type { CanvasElement } from "../model";
+import type { CanvasElement } from "../types/elements";
 
 export type TextEditTarget = {
   cardId: string;
@@ -43,9 +43,12 @@ export interface CanvasTextEditorOptions {
 export class CanvasTextEditor {
   private state: TextEditState | null = null;
 
+  private readonly options: CanvasTextEditorOptions;
   constructor(
-    private readonly options: CanvasTextEditorOptions,
-  ) { }
+    options: CanvasTextEditorOptions
+  ) {
+    this.options = options
+  }
 
   get active(): boolean {
     return this.state !== null;

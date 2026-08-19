@@ -15,9 +15,11 @@ export class CanvasHistoryController<TSnapshot> {
 
   private readonly maxEntries: number;
 
+  private readonly options: CanvasHistoryOptions<TSnapshot>;
   constructor(
-    private readonly options: CanvasHistoryOptions<TSnapshot>,
+    options: CanvasHistoryOptions<TSnapshot>
   ) {
+    this.options = options
     this.maxEntries = options.maxEntries ?? 100;
   }
 

@@ -1,6 +1,9 @@
 import { Container, Graphics, Sprite, Text, TextStyle, type Texture } from "pixi.js";
-import { Element } from "./entities";
-import type { BaseElement, CanvasCard, EditState, Point } from "./model";
+import type { BaseElement } from "../types/elements";
+import { Element } from "./element";
+import type { CanvasCard } from "./card";
+import type { Point } from "../types/geometry";
+import type { EditState } from "../types/events";
 
 export type TextFont = "inter" | "serif" | "mono" | "rounded";
 export type TextVariant = "body" | "heading" | "caption" | "latex";
@@ -59,6 +62,7 @@ export class BaseTextElement extends Element {
     this.italic = init.italic ?? false;
     this.underline = init.underline ?? false;
     this.highlightColor = init.highlightColor;
+    this.id = init.id;
   }
 
   displayedFontSize() { return this.variant === "latex" ? this.fontSize * 0.82 : this.fontSize; }
@@ -70,7 +74,8 @@ export class BaseTextElement extends Element {
   selectionAppearance() { return { color: 0x4f7fe8, frameWidth: 1.75, handleSize: 9, handleWidth: 2 }; }
 }
 
-export class TextElement extends BaseTextElement {}
+export class TextElement extends BaseTextElement { }
+
 
 export function createTextElement(init: TextElementInit) {
   return new TextElement(init);

@@ -1,9 +1,6 @@
+import type { CanvasPersistence } from "../persistence/persistence";
+import type { CanvasBoardDocument, CanvasBoardSummary } from "../types/canvas";
 
-import type {
-  CanvasBoardSummary,
-  CanvasBoardDocument,
-} from "../types";
-import { CanvasPersistence } from "./persistence";
 
 export interface CanvasBoardManagerOptions {
   persistence: CanvasPersistence;
@@ -22,9 +19,13 @@ export class CanvasBoardManager {
 
   private activeBoardId: string | null = null;
 
+  private readonly options: CanvasBoardManagerOptions;
+
   constructor(
-    private readonly options: CanvasBoardManagerOptions,
-  ) { }
+    options: CanvasBoardManagerOptions,
+  ) {
+    this.options = options;
+  }
 
   get currentBoardId(): string | null {
     return this.activeBoardId;

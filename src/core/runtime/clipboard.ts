@@ -1,12 +1,6 @@
-import type {
-  CanvasCard,
-  CanvasElement,
-} from "../types";
-
-import {
-  createTextElement,
-  type TextElementInit,
-} from "../model";
+import type { CanvasCard } from "../model/card";
+import { createTextElement, type TextElementInit } from "../model/text";
+import type { CanvasElement } from "../types/elements";
 import { translateElement } from "./scene";
 
 export class CanvasClipboard {

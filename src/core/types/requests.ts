@@ -41,3 +41,23 @@ export interface UploadedCanvasImage {
   name: string;
 }
 
+
+export interface CanvasBoardSummary {
+  id: string;
+  name: string;
+  createdAt?: number;
+  updatedAt?: number;
+}
+
+export interface CanvasBoard {
+  id: string;
+  name: string;
+
+  cards: CanvasCard[];
+  links: CanvasLink[];
+}
+
+export interface CanvasBoardDocument {
+  board: CanvasBoard;
+  viewport: CanvasViewport;
+}

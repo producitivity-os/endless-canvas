@@ -1,6 +1,6 @@
-import { CANVAS_TYPE_OPTIONS } from "../constants";
-import { defaultCanvasMetadata, type CanvasGridStyle, type CanvasMetadata, type CanvasTheme } from "../model";
-import { EndlessCanvasRuntimeOptions } from "../types";
+import { CANVAS_TYPE_OPTIONS } from "../constants/constants";
+import { defaultCanvasMetadata, type CanvasGridStyle, type CanvasMetadata, type CanvasTheme } from "../model/canvas";
+import type { EndlessCanvasRuntimeOptions } from "../types/runtime";
 
 export type CanvasPreferences = {
   gridSize: number;
@@ -56,9 +56,11 @@ export function saveCanvasPreferences(boardId: string, preferences: CanvasPrefer
 export class CanvasPreferencesController {
   private value: CanvasPreferences;
 
+  private readonly store: EndlessCanvasRuntimeOptions["preferences"];
   constructor(
-    private readonly store: EndlessCanvasRuntimeOptions["preferences"],
+    store: EndlessCanvasRuntimeOptions["preferences"]
   ) {
+    this.store = store
     this.value = store.current();
   }
 

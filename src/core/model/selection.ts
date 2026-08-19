@@ -1,4 +1,4 @@
-import type { BaseElement } from "../types/types";
+import type { BaseElement } from "../types/elements";
 import { RectangleElement } from "./shapes/rectangle";
 
 export class SelectionFrame extends RectangleElement {

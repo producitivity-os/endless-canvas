@@ -1,4 +1,5 @@
-import type { BaseElement, CanvasElement, Point } from "./types";
+import type { BaseElement, CanvasElement } from "../types/elements";
+import type { Point } from "../types/geometry";
 
 export abstract class Element implements BaseElement {
   abstract readonly type: CanvasElement["type"] | "arrow";

@@ -1,3 +1,5 @@
+import type { BaseElement } from "../types/elements";
+import { Element } from "./element";
 
 export type ShapeInit = BaseElement & { fill: number; stroke: number; strokeWidth?: number; opacity?: number; fillStyle?: "solid" | "hachure" | "cross-hatch" | "none" };
 

@@ -1,29 +1,19 @@
-import {
-  CanvasLink,
-  DragSession,
-  type CanvasElement,
-  type Draggable,
-  type Point,
-} from "../model";
 
-import type {
-  BoardDrag,
-  BoardTool,
-  CanvasCard,
-  LinkHead,
-  LinkRouting,
-} from "../types";
-
-import type { CanvasObjectSource } from "./spatial.ts";
-import type { CanvasSpatialIndex } from "./spatial.ts";
 import type { CanvasSelectionController } from "./selection";
 
 import {
   type BoardRuntimeState,
   CanvasScene,
 } from "./scene";
-import { resizeBoundsFromCorner } from "./geometry";
-import { minCardHeight, minCardWidth } from "../engine";
+import type { CanvasElement } from "../types/elements";
+import type { CanvasObjectSource, CanvasSpatialIndex } from "../engine/spatial";
+import type { CanvasCard } from "../model/card";
+import { CanvasLink } from "../model/arrow";
+import type { BoardDrag, BoardTool, LinkHead, LinkRouting } from "../types/events";
+import type { Point } from "../types/geometry";
+import { DragSession, type Draggable } from "../model/drag";
+import { resizeBoundsFromCorner } from "../engine/geometry";
+import { minCardHeight, minCardWidth } from "../engine/utils";
 
 type TextElement = Extract<
   CanvasElement,
@@ -115,6 +105,15 @@ export interface CanvasBoardControllerOptions {
 }
 
 export class CanvasBoardController {
+
+  private readonly options: CanvasBoardControllerOptions;
+
+  constructor(
+    options: CanvasBoardControllerOptions,
+  ) {
+    this.options = options;
+  }
+
   readonly state: BoardRuntimeState = {
     tool: "mouse",
     interactionMode: "canvas",
@@ -134,9 +133,6 @@ export class CanvasBoardController {
       time: 0,
     };
 
-  constructor(
-    private readonly options: CanvasBoardControllerOptions,
-  ) { }
 
   setDrawingMode(
     enabled: boolean,

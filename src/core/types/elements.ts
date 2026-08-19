@@ -1,3 +1,5 @@
+import type { BaseTextElement } from "../model/text";
+import type { Point } from "./geometry";
 
 export type BaseElement = { id: string; x: number; y: number; width: number; height: number; rotation?: number };
 export type CanvasElement =

@@ -2,31 +2,11 @@ import {
   Application,
   Container,
   Graphics,
-} from "pixi.js";
-
-import type {
-  BoardDrag,
-  BoardTool,
-  CanvasCard,
-  DetailDrag,
-  DetailTool,
-  LinkHead,
-  LinkRouting,
-} from "../types";
-
-import type {
-  CanvasElement,
   Point,
-  TextVariant,
-  TextElementInit,
-} from "../model";
-
-import {
-  CanvasLink,
-  createTextElement,
-} from "../model";
-
-
+} from "pixi.js";
+import type { BoardDrag, BoardTool, DetailDrag, DetailTool, LinkHead, LinkRouting } from "../types/events";
+import type { TextVariant } from "../model/text";
+import type { CanvasElement } from "../types/elements";
 
 export type LinkMode = {
   routing: LinkRouting;

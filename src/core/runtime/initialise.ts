@@ -1,21 +1,19 @@
 import { cardsForStorage, normalizeLoadedCards, normalizeLoadedLinks } from "../store/serialization";
 import { CanvasPreferencesController } from "./preferences";
 import { CanvasSelectionController } from "./selection";
-import { CanvasObjectSource, CanvasSpatialIndex } from "./spatial";
 import { CanvasHistoryController } from "./history";
 import { CanvasClipboard } from "./clipboard";
-import { CanvasPersistence } from "./persistence";
-import { createCanvasBoard, deleteCanvasBoard, loadCanvasBoards, loadCanvasStore, saveCanvasStore, updateCanvasBoardName } from "@/api/canvas";
-import { EndlessCanvasRuntimeOptions, Snapshot } from "../types";
 import { CanvasBoardManager } from "./manager";
 import { CanvasTextEditor } from "./texteditor";
-import { CanvasBoardRenderer, CanvasDetailRenderer, CanvasRenderer } from "./render";
-import { screenToWorld } from "../engine";
-import { renderElementArrows } from "../arrow";
-import { CanvasInteractionController } from "./interaction";
 import { CanvasScene } from "./scene";
 import { CanvasBoardController } from "./board";
 import { CanvasDetailController } from "./detail";
+import { CanvasPersistence } from "../persistence/persistence";
+import type { CanvasBoard, CanvasBoardDocument, Snapshot } from "../types/canvas";
+import type { CanvasBoardsResponse } from "../types/responses";
+import type { CanvasRuntimeDocument, EndlessCanvasRuntimeOptions } from "../types/runtime";
+import { CanvasSpatialIndex, type CanvasObjectSource } from "../engine/spatial";
+import type { CanvasRenderer } from "../rendering/render";
 
 
 
@@ -23,51 +21,97 @@ import { CanvasDetailController } from "./detail";
 // Persistence
 // ---------------------------------------------------------------------------
 
-const createPersistence = (scene: any, documentState: any) =>
-  new CanvasPersistence({
+
+
+export interface CanvasPersistenceAdapter {
+  loadBoards(): Promise<CanvasBoardsResponse>;
+
+  loadBoard(
+    boardId: string,
+  ): Promise<CanvasBoardDocument>;
+
+  saveBoard(
+    document: CanvasBoardDocument,
+  ): Promise<void>;
+
+  createBoard(
+    name: string,
+  ): Promise<CanvasBoard>;
+
+  renameBoard(
+    boardId: string,
+    name: string,
+  ): Promise<CanvasBoard>;
+
+  duplicateBoard(
+    boardId: string,
+  ): Promise<CanvasBoard>;
+
+  deleteBoard(
+    boardId: string,
+  ): Promise<void>;
+
+  setActiveBoard?(
+    boardId: string,
+  ): Promise<void>;
+}
+
+function createPersistence(
+  options: EndlessCanvasRuntimeOptions,
+  scene: CanvasScene,
+  documentState: CanvasRuntimeDocument,
+  getCurrentBoard: () => CanvasBoard | null,
+) {
+  return new CanvasPersistence({
     store: {
       async loadBoards() {
         const result =
-          await loadCanvasBoards();
+          await options.persistence.loadBoards();
 
         return result.boards;
       },
 
-      async loadBoard(boardId) {
-        const stored =
-          await loadCanvasStore(
+      async loadBoard(
+        boardId,
+      ) {
+        const document =
+          await options.persistence.loadBoard(
             boardId,
           );
 
-        const loadedCards =
-          normalizeLoadedCards(
-            stored.cards,
-          );
-
-        const loadedLinks =
-          normalizeLoadedLinks(
-            stored.links,
-            loadedCards,
-          );
-
         return {
-          id: boardId,
-          name:
-            stored.name ??
-            "Untitled Canvas",
-          cards: loadedCards,
-          links: loadedLinks,
+          ...document.board,
+
+          cards:
+            normalizeLoadedCards(
+              document.board.cards,
+            ),
+
+          links:
+            normalizeLoadedLinks(
+              document.board.links,
+              document.board.cards,
+            ),
         };
       },
 
-      async saveBoard(board) {
-        await saveCanvasStore(
-          board.id,
-          cardsForStorage(
-            documentState.snapshotCards(),
-          ),
-          documentState.snapshotLinks(),
-          {
+      async saveBoard(
+        board,
+      ) {
+        await options.persistence.saveBoard({
+          board: {
+            id: board.id,
+            name: board.name,
+
+            cards: cardsForStorage(
+              documentState.snapshotCards(),
+            ),
+
+            links:
+              documentState.snapshotLinks(),
+          },
+
+          viewport: {
             x:
               scene.boardViewport.x,
 
@@ -78,74 +122,63 @@ const createPersistence = (scene: any, documentState: any) =>
               scene.boardViewport
                 .scale.x,
           },
-        );
+        });
       },
 
-      async createBoard(name) {
-        return createCanvasBoard(
-          name,
-        );
+      createBoard(
+        name,
+      ) {
+        return options.persistence
+          .createBoard(name);
       },
 
-      async renameBoard(
+      renameBoard(
         boardId,
         name,
       ) {
-        await updateCanvasBoardName(
-          boardId,
-          name,
-        );
+        return options.persistence
+          .renameBoard(
+            boardId,
+            name,
+          )
+          .then(() => undefined);
       },
 
-      async duplicateBoard(
+      duplicateBoard(
         boardId,
       ) {
-        throw new Error(
-          `duplicateBoard(${boardId}) not extracted yet`,
-        );
+        return options.persistence
+          .duplicateBoard(
+            boardId,
+          );
       },
 
-      async deleteBoard(
+      deleteBoard(
         boardId,
       ) {
-        await deleteCanvasBoard(
-          boardId,
-        );
+        return options.persistence
+          .deleteBoard(
+            boardId,
+          );
       },
     },
 
-    getCurrentBoard: () => {
-      const boardId =
-        boardManager.currentBoardId;
-
-      if (!boardId) {
-        return null;
-      }
-
-      return {
-        id: boardId,
-
-        name:
-          boardManager
-            .currentBoard
-            ?.name ??
-          "Untitled Canvas",
-
-        cards:
-          documentState.cards,
-
-        links:
-          documentState.links,
-      };
-    },
+    getCurrentBoard,
 
     onError(error) {
       console.warn(
-        "Failed to save canvas.",
+        "Failed to persist canvas.",
         error,
+      );
+
+      options.onError?.(
+        error instanceof Error
+          ? error.message
+          : String(error),
       );
     },
   });
+}
 
 export async function initializeCanvasRuntime(
   host: HTMLElement,

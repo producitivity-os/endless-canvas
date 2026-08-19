@@ -1,6 +1,8 @@
 import type { CanvasEngine } from "../engine/utils";
 import type { CanvasLink } from "../model/arrow";
 import type { CanvasCard } from "../model/card";
+import type { CanvasAssetAdapter } from "../runtime/asset";
+import type { CanvasPersistenceAdapter } from "../runtime/initialise";
 import type { CanvasPreferences } from "../runtime/preferences";
 import type { CanvasViewport } from "./canvas";
 
@@ -9,6 +11,8 @@ export type EndlessCanvasRuntimeOptions = {
   document: CanvasRuntimeDocument;
   // algorithms: CanvasRuntimeDependencies;
   // ui: CanvasUiController;
+  persistence: CanvasPersistenceAdapter;
+  assets?: CanvasAssetAdapter;
 
   preferences: {
     current: () => CanvasPreferences;
@@ -32,6 +36,7 @@ export type EndlessCanvasRuntimeOptions = {
   onError?: (
     message: string,
   ) => void;
+
 };
 
 

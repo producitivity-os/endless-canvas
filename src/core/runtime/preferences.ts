@@ -76,6 +76,12 @@ export class CanvasPreferencesController {
     this.store.change(boardId, this.value);
   }
 
+  set(
+    preferences: CanvasPreferences,
+  ): void {
+    this.value = preferences;
+  }
+
   update(
     changes: Partial<CanvasPreferences>,
   ): void {

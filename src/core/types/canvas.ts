@@ -1,8 +1,8 @@
 import type { Container, Graphics, Point } from "pixi.js";
 import type { CanvasLink, ElementArrow } from "../model/arrow";
 import type { CanvasElement } from "./elements";
-import type { LinkHead, LinkRouting } from "./types";
 import type { CanvasCard } from "../model/card";
+import type { LinkHead, LinkRouting } from "./events";
 
 export interface CanvasHealthStatus {
   healthy: boolean;
@@ -11,6 +11,10 @@ export interface CanvasHealthStatus {
 export interface CanvasBoard {
   id: string;
   name: string;
+
+  cards: CanvasCard[];
+  links: CanvasLink[];
+
   createdAt?: number;
   updatedAt?: number;
 }
@@ -73,11 +77,9 @@ export type CanvasBoardSummary = {
 };
 
 export type CanvasBoardDocument = {
-  id: string;
-  name: string;
+  board: CanvasBoard;
+  viewport: CanvasViewport;
 
-  cards: CanvasCard[];
-  links: CanvasLink[];
 };
 
 

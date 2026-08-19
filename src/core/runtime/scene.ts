@@ -2,11 +2,11 @@ import {
   Application,
   Container,
   Graphics,
-  Point,
 } from "pixi.js";
 import type { BoardDrag, BoardTool, DetailDrag, DetailTool, LinkHead, LinkRouting } from "../types/events";
 import type { TextVariant } from "../model/text";
 import type { CanvasElement } from "../types/elements";
+import type { Point } from "../types/geometry";
 
 export type LinkMode = {
   routing: LinkRouting;

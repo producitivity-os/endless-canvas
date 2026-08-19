@@ -13,7 +13,9 @@ import type { CanvasBoard, CanvasBoardDocument, Snapshot } from "../types/canvas
 import type { CanvasBoardsResponse } from "../types/responses";
 import type { CanvasRuntimeDocument, EndlessCanvasRuntimeOptions } from "../types/runtime";
 import { CanvasSpatialIndex, type CanvasObjectSource } from "../engine/spatial";
-import type { CanvasRenderer } from "../rendering/render";
+import { CanvasBoardRenderer, CanvasDetailRenderer, CanvasRenderer } from "../rendering/render";
+import { screenToWorld } from "../engine/utils";
+import { CanvasInteractionController } from "../interaction/interaction";
 
 
 
@@ -74,23 +76,23 @@ function createPersistence(
       async loadBoard(
         boardId,
       ) {
-        const document =
+        const boardDocument =
           await options.persistence.loadBoard(
             boardId,
           );
 
         return {
-          ...document.board,
+          ...boardDocument.board,
 
           cards:
             normalizeLoadedCards(
-              document.board.cards,
+              boardDocument.board.cards,
             ),
 
           links:
             normalizeLoadedLinks(
-              document.board.links,
-              document.board.cards,
+              boardDocument.board.links,
+              boardDocument.board.cards,
             ),
         };
       },
@@ -102,7 +104,6 @@ function createPersistence(
           board: {
             id: board.id,
             name: board.name,
-
             cards: cardsForStorage(
               documentState.snapshotCards(),
             ),
@@ -394,11 +395,10 @@ export async function initializeCanvasRuntime(
       persistence,
 
       onBoardChanged(
-        board,
+        boardDocument,
       ) {
         documentState.hydrate(
-          board.cards,
-          board.links,
+          boardDocument.board,
         );
 
         selection.clearAll();
@@ -406,7 +406,7 @@ export async function initializeCanvasRuntime(
         spatialIndex.invalidateAll();
 
         preferences.activate(
-          board.id,
+          boardDocument.board.id,
         );
 
         renderer?.render(mode);

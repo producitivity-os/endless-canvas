@@ -4,7 +4,7 @@ import type { CanvasCard } from "../model/card";
 import type { CanvasAssetAdapter } from "../runtime/asset";
 import type { CanvasPersistenceAdapter } from "../runtime/initialise";
 import type { CanvasPreferences } from "../runtime/preferences";
-import type { CanvasViewport } from "./canvas";
+import type { CanvasBoard, CanvasViewport } from "./canvas";
 
 export type EndlessCanvasRuntimeOptions = {
   engine: CanvasEngine;
@@ -42,22 +42,19 @@ export type EndlessCanvasRuntimeOptions = {
 
 
 export type CanvasRuntimeDocument = {
+
+  board: CanvasBoard;
   cards: CanvasCard[];
   links: CanvasLink[];
 
   primaryCard: {
     id: string;
   };
-
   selectedCardIds: Set<string>;
   selectedLinkIds: Set<string>;
   selectedElementIds: Set<string>;
   selectedElementArrowIds: Set<string>;
 
-  hydrate: (
-    cards: CanvasCard[],
-    links: CanvasLink[],
-  ) => void;
 
   commit: (
     origin?: string,
@@ -131,5 +128,17 @@ export type CanvasRuntimeDocument = {
 
   flushSync: () =>
     Promise<void>;
+
+
+  hydrate(
+    board: CanvasBoard,
+  ): void;
+
+  snapshotBoard(): CanvasBoard;
+
+  setBoard(
+    board: CanvasBoard,
+  ): void;
 };
+
 

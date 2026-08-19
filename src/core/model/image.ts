@@ -1,4 +1,4 @@
-// image.ts
+import type { BaseElement } from "../types/types";
 
 export async function imageDataUrlSize(
   dataUrl: string,
@@ -26,4 +26,13 @@ export async function imageDataUrlSize(
 
     image.src = dataUrl;
   });
+}
+
+export class ImageElement extends Element {
+  readonly type = "image" as const;
+  src: string; name?: string; crop?: { x: number; y: number; width: number; height: number }; previewSrc?: string;
+  uploadStatus?: "uploading" | "ready" | "failed"; lockAspectRatio?: boolean; opacity?: number; cornerRadius?: number;
+  constructor(init: BaseElement & Omit<ImageElement, keyof Element | "type" | "moveTo" | "translate" | "bounds">) {
+    super(init); this.src = init.src; this.name = init.name; this.crop = init.crop; this.previewSrc = init.previewSrc; this.uploadStatus = init.uploadStatus; this.lockAspectRatio = init.lockAspectRatio; this.opacity = init.opacity; this.cornerRadius = init.cornerRadius;
+  }
 }

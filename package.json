@@ -5,9 +5,12 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./model": "./src/model/index.ts",
-    "./runtime": "./src/runtime/index.ts",
-    "./interaction": "./src/interaction/index.ts"
+    "./core": "./src/core/index.ts",
+    "./react": "./src/react/index.ts",
+    "./interaction": "./src/interaction/index.ts",
+    "./rendering": "./src/rendering/index.ts",
+    "./engine": "./src/engine/index.ts",
+    "./persistence": "./src/persistence/index.ts"
   },
   "scripts": {
     "playground": "vite playground",

@@ -7,32 +7,8 @@ import type {
   ElementArrow,
 } from "./model";
 import type { BaseTextElement } from "./text";
-import { CanvasEngine } from "./engine";
-import { CanvasRuntimeDependencies, CanvasUiController } from "@/components/canvas/ui/CanvasUiController";
-import { CanvasPreferences } from "./runtime/preferences";
 
-export type Point = { x: number; y: number };
-export type BaseElement = { id: string; x: number; y: number; width: number; height: number; rotation?: number };
-export type CanvasElement =
-  | BaseTextElement
-  | (BaseElement & { type: "rect"; fill: number; stroke: number; strokeWidth?: number; opacity?: number; fillStyle?: "solid" | "hachure" | "cross-hatch" | "none"; cornerRadius?: number })
-  | (BaseElement & { type: "ellipse"; fill: number; stroke: number; strokeWidth?: number; opacity?: number; fillStyle?: "solid" | "hachure" | "cross-hatch" | "none" })
-  | (BaseElement & { type: "image"; src: string; name?: string; crop?: { x: number; y: number; width: number; height: number }; previewSrc?: string; uploadStatus?: "uploading" | "ready" | "failed"; lockAspectRatio?: boolean; opacity?: number; cornerRadius?: number })
-  | { id: string; type: "path"; points: Point[]; color: number; width: number; rotation?: number };
 
-export type CanvasCardInit = {
-  id: string;
-  kind?: "text";
-  textSizing?: "fit" | "custom";
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  elements: CanvasElement[];
-  arrows?: ElementArrow[];
-  backgroundColor?: number;
-  locked?: boolean;
-};
 
 export type { CanvasCard } from "./model";
 export type LinkRouting = "straight" | "bezier" | "orthogonal";
@@ -216,95 +192,3 @@ export type CanvasRuntimeDocument = {
     Promise<void>;
 };
 
-export type EndlessCanvasRuntimeOptions = {
-  engine: CanvasEngine;
-  document: CanvasRuntimeDocument;
-  algorithms: CanvasRuntimeDependencies;
-  ui: CanvasUiController;
-
-  preferences: {
-    current: () => CanvasPreferences;
-
-    activateBoard: (
-      boardId: string,
-    ) => CanvasPreferences;
-
-    change: (
-      boardId: string,
-      preferences: CanvasPreferences,
-    ) => void;
-
-    subscribe: (
-      listener: (
-        preferences: CanvasPreferences,
-      ) => void,
-    ) => () => void;
-  };
-
-  onError?: (
-    message: string,
-  ) => void;
-};
-
-
-export interface CanvasBoard {
-  id: string;
-  name: string;
-  createdAt?: number;
-  updatedAt?: number;
-}
-
-export interface CanvasBoardsResponse {
-  boards: CanvasBoard[];
-  activeBoardId: string;
-}
-
-export interface CanvasStore {
-  boardId: string;
-  cards: CanvasCard[];
-  links: CanvasLink[];
-  viewport?: CanvasViewport;
-  name: string;
-}
-
-export interface CreateCanvasBoardRequest {
-  name: string;
-}
-
-export interface RenameCanvasBoardRequest {
-  boardId: string;
-  name: string;
-}
-
-export interface DeleteCanvasBoardRequest {
-  boardId: string;
-}
-
-export interface SetActiveCanvasBoardRequest {
-  boardId: string;
-}
-
-export interface LoadCanvasStoreRequest {
-  boardId?: string;
-}
-
-export interface SaveCanvasStoreRequest {
-  boardId: string;
-  cards: CanvasCard[];
-  links: CanvasLink[];
-  viewport: CanvasViewport;
-}
-
-export interface UploadCanvasImageRequest {
-  dataUrl: string;
-  name: string;
-}
-
-export interface UploadedCanvasImage {
-  url: string;
-  name: string;
-}
-
-export interface CanvasHealthStatus {
-  healthy: boolean;
-}

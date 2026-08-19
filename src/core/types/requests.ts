@@ -1,3 +1,6 @@
+import type { CanvasLink } from "../model/arrow";
+import type { CanvasCard } from "../model/card";
+import type { CanvasViewport } from "./canvas";
 
 
 export interface CreateCanvasBoardRequest {

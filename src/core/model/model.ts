@@ -1,0 +1,266 @@
+import { Container, Graphics, Rectangle } from "pixi.js";
+import { Arrow, hydrateElement } from "./entities";
+import { renderStaticIllustrationArrows } from "./arrow";
+import {
+  fitElementBounds,
+  fittedCardPadding,
+  illustrationCardPadding,
+  minCardHeight,
+  minCardWidth,
+} from "./engine";
+import type { CanvasEngine } from "./engine";
+import { CARD_FILL, CARD_SELECTED, CARD_STROKE } from "./constants";
+import { BaseTextElement, TextElement, type TextElementInit } from "./text";
+import type { BaseElement, CanvasCardInit, CanvasElement, CardIndexItem, CardView, LinkAppearanceInit, Point } from "./types";
+
+export { BaseTextElement, TextElement, createTextElement } from "./text";
+export type { TextElementInit, TextFont, TextVariant, TextWeight } from "./text";
+export type {
+  BaseElement, BoardDrag, BoardTool, CanvasBoard, CanvasCardInit, CanvasElement, CanvasIconName, CanvasLibraryView,
+  CanvasViewport, CardIndexItem, CardView, DetailDrag, DetailTool, EditState, ElementIndexItem,
+  LinkAppearanceInit, LinkHead, LinkIndexItem, LinkNode, LinkRouting, MenuAction, Point, ResizeCorner, Snapshot,
+} from "./types";
+
+export type CanvasGridStyle = "lines" | "dots" | "none";
+export type CanvasTheme = "light" | "dark";
+export type CanvasType = "basic" | "flowchart" | "mind-map";
+export type CanvasLayer = { id: string; name: string };
+export type CanvasMetadata = { type: CanvasType; description: string; layers: CanvasLayer[]; activeLayerId: string };
+
+export function defaultCanvasMetadata(): CanvasMetadata {
+  return { type: "basic", description: "", layers: [{ id: "main", name: "Main layer" }], activeLayerId: "main" };
+}
+
+type CardRenderOptions = {
+  selected?: boolean;
+  scale?: number;
+  highlight?: "none" | "hover" | "solid";
+  hiddenElementId?: string;
+  revision?: number;
+};
+type ResolvedCardRenderOptions = Required<CardRenderOptions>;
+
+export abstract class CanvasCard {
+  abstract kind?: "text";
+  id: string;
+  textSizing?: "fit" | "custom";
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  elements: CanvasElement[];
+  arrows?: ElementArrow[];
+  backgroundColor?: number;
+  locked: boolean;
+
+  constructor(init: CanvasCardInit) {
+    this.id = init.id;
+    this.textSizing = init.textSizing;
+    this.x = init.x;
+    this.y = init.y;
+    this.width = init.width;
+    this.height = init.height;
+    this.elements = init.elements.map((element) =>
+      element.type === "text" ? new TextElement(element as TextElementInit) : hydrateElement(element),
+    );
+    this.arrows = init.arrows?.map((arrow) => new ElementArrow({
+      ...arrow,
+      routing: arrow.routing ?? "straight",
+      endHead: arrow.endHead ?? "triangle",
+    }));
+    this.backgroundColor = init.backgroundColor;
+    this.locked = init.locked ?? false;
+  }
+
+  indexItem(): CardIndexItem {
+    return { minX: this.x, minY: this.y, maxX: this.x + this.width, maxY: this.y + this.height, id: this.id };
+  }
+
+  contentBounds() {
+    const bounds = this.elements.map(fitElementBounds).filter((value): value is Rectangle => Boolean(value));
+    if (bounds.length === 0) return null;
+    const minX = Math.min(...bounds.map(({ x }) => x));
+    const minY = Math.min(...bounds.map(({ y }) => y));
+    const maxX = Math.max(...bounds.map(({ x, width }) => x + width));
+    const maxY = Math.max(...bounds.map(({ y, height }) => y + height));
+    return new Rectangle(minX, minY, maxX - minX, maxY - minY);
+  }
+
+  fitToContent() {
+    const bounds = this.contentBounds();
+    if (!bounds) {
+      this.width = minCardWidth;
+      this.height = minCardHeight;
+      return;
+    }
+
+    const padding = this.kind === "text" ? fittedCardPadding : illustrationCardPadding;
+    const offset = { x: bounds.x - padding, y: bounds.y - padding };
+    this.x += offset.x;
+    this.y += offset.y;
+    this.width = bounds.width + padding * 2;
+    this.height = bounds.height + padding * 2;
+    for (const element of this.elements) {
+      if (element.type === "path") {
+        for (const point of element.points) {
+          point.x -= offset.x;
+          point.y -= offset.y;
+        }
+      } else {
+        element.x -= offset.x;
+        element.y -= offset.y;
+      }
+    }
+  }
+
+  createView(engine: CanvasEngine, revision = 0): CardView {
+    const view = this.buildView();
+    this.render(engine, view, { revision });
+    return view;
+  }
+
+  render(engine: CanvasEngine, view: CardView, options: CardRenderOptions = {}) {
+    const state: ResolvedCardRenderOptions = {
+      selected: false,
+      scale: 1,
+      highlight: "none",
+      hiddenElementId: "",
+      revision: 0,
+      ...options,
+    };
+    this.renderFrame(view, state);
+    this.renderContent(engine, view, state);
+    this.renderSelection(view, state);
+    this.renderHandles(view, state);
+  }
+
+  private buildView(): CardView {
+    const view: CardView = {
+      root: new Container(),
+      background: new Graphics(),
+      content: new Container(),
+      contentMask: new Graphics(),
+      border: new Graphics(),
+      topLeftHandle: new Graphics(),
+      bottomRightHandle: new Graphics(),
+    };
+
+    view.root.eventMode = view.topLeftHandle.eventMode = view.bottomRightHandle.eventMode = "static";
+    view.root.cursor = "move";
+    view.topLeftHandle.cursor = view.bottomRightHandle.cursor = "nwse-resize";
+    view.content.mask = view.contentMask;
+    view.root.addChild(view.background, view.content, view.contentMask, view.border, view.topLeftHandle, view.bottomRightHandle);
+    return view;
+  }
+
+  private renderFrame(view: CardView, { selected, scale }: ResolvedCardRenderOptions) {
+    const chromeScale = 1 / Math.max(0.001, scale);
+    view.root.position.set(this.x, this.y);
+    view.root.hitArea = new Rectangle(
+      0,
+      0,
+      this.width,
+      Math.max(this.height, selected ? 58 * chromeScale : this.height),
+    );
+    view.background
+      .clear()
+      .roundRect(0, 0, this.width, this.height, 8)
+      .fill({ color: this.backgroundColor ?? CARD_FILL })
+      .stroke({ color: CARD_STROKE, width: 1.5 * chromeScale });
+    view.contentMask
+      .clear()
+      .roundRect(fittedCardPadding, fittedCardPadding, Math.max(0, this.width - fittedCardPadding * 2), Math.max(0, this.height - fittedCardPadding * 2), 7)
+      .fill({ color: 0xffffff });
+  }
+
+  private renderContent(engine: CanvasEngine, view: CardView, { hiddenElementId, scale, revision }: ResolvedCardRenderOptions) {
+    const signature = `${revision}|${hiddenElementId}|${scale}|${JSON.stringify(this.elements)}|${JSON.stringify(this.arrows ?? [])}`;
+    if (view.contentSignature === signature) return;
+    for (const child of view.content.removeChildren()) child.destroy();
+    renderStaticIllustrationArrows(view.content, this);
+    for (const element of this.elements) if (element.id !== hiddenElementId) engine.drawElement(view.content, element);
+    view.contentSignature = signature;
+  }
+
+  private renderSelection(view: CardView, { selected, scale, highlight }: ResolvedCardRenderOptions) {
+    const chromeScale = 1 / Math.max(0.001, scale);
+    view.border.clear();
+    if (selected || highlight !== "none") {
+      const solid = selected || highlight === "solid";
+      view.border.roundRect(0, 0, this.width, this.height, 8).stroke({
+        color: CARD_SELECTED,
+        width: (solid ? 3 : 2) * chromeScale,
+        alpha: solid ? 1 : 0.38,
+      });
+    }
+  }
+
+  private renderHandles(view: CardView, { selected, scale }: ResolvedCardRenderOptions) {
+    const chromeScale = 1 / Math.max(0.001, scale);
+    const handleSize = 14 * chromeScale;
+    const hitSize = 38 * chromeScale;
+    for (const handle of [view.topLeftHandle, view.bottomRightHandle]) {
+      handle.clear();
+      handle.hitArea = new Rectangle(-hitSize / 2, -hitSize / 2, hitSize, hitSize);
+      handle.visible = selected && !this.locked;
+    }
+    if (selected && !this.locked) {
+      const inset = 8 * (1 - Math.SQRT1_2);
+      for (const handle of [view.topLeftHandle, view.bottomRightHandle]) {
+        handle.circle(0, 0, handleSize / 2).fill({ color: CARD_SELECTED }).stroke({ color: 0xffffff, width: 2 * chromeScale });
+      }
+      view.topLeftHandle.position.set(inset, inset);
+      view.bottomRightHandle.position.set(this.width - inset, this.height - inset);
+    }
+  }
+
+}
+export class IllustrationCard extends CanvasCard { kind = undefined; }
+export class TextCard extends CanvasCard { kind = "text" as const; }
+export function createCard(init: CanvasCardInit) { return init.kind === "text" ? new TextCard(init) : new IllustrationCard(init); }
+
+export class BaseArrow extends Arrow {
+  fromAnchor: Point; toAnchor: Point;
+  constructor(init: LinkAppearanceInit) {
+    super({ id: init.id, startPoint: init.fromAnchor, endPoint: init.toAnchor, startHead: init.startHead, endHead: init.endHead, routing: init.routing, bend: init.bend, strokeWidth: init.strokeWidth });
+    this.routing = init.routing === "straight" || init.routing === "orthogonal" ? init.routing : "bezier";
+    this.startHead = ["triangle", "triangle-outline", "chicken"].includes(init.startHead ?? "") ? init.startHead! : "none";
+    this.endHead = ["triangle", "triangle-outline", "chicken"].includes(init.endHead ?? "") ? init.endHead! : "none";
+    this.fromAnchor = init.fromAnchor ?? { x: 0.5, y: 0.5 }; this.toAnchor = init.toAnchor ?? { x: 0.5, y: 0.5 };
+    this.bend = Number.isFinite(init.bend) ? init.bend! : 0; this.strokeWidth = Number.isFinite(init.strokeWidth) ? init.strokeWidth! : 2.8;
+  }
+}
+export class ElementArrow extends BaseArrow {
+  id: string;
+  fromElementId: string; toElementId: string; constructor(init: LinkAppearanceInit & { fromElementId: string; toElementId: string }) { super(init); this.fromElementId = init.fromElementId; this.toElementId = init.toElementId; this.connectedElementIds = [init.fromElementId, init.toElementId]; }
+}
+export class CanvasLink extends BaseArrow {
+  fromId: string;
+  toId: string;
+  label: string;
+
+  constructor(init: LinkAppearanceInit & { fromId: string; toId: string; label?: string }) {
+    super(init);
+    this.id = init.id ?? crypto.randomUUID();
+    this.fromId = init.fromId;
+    this.toId = init.toId;
+    this.connectedElementIds = [init.fromId, init.toId];
+    this.label = init.label ?? "";
+  }
+}
+
+export interface Draggable { readonly id: string; position(): Point; moveTo(position: Point): void; }
+export class DragSession {
+  private readonly origins = new Map<string, { target: Draggable; position: Point }>();
+  constructor(private readonly pointerOrigin: Point, targets: Iterable<Draggable>) { for (const target of targets) this.origins.set(target.id, { target, position: target.position() }); }
+  move(pointer: Point) { const dx = pointer.x - this.pointerOrigin.x; const dy = pointer.y - this.pointerOrigin.y; for (const { target, position } of this.origins.values()) target.moveTo({ x: position.x + dx, y: position.y + dy }); }
+}
+function elementPosition(element: CanvasElement): Point { if (element.type !== "path") return { x: element.x, y: element.y }; return { x: Math.min(...element.points.map((point) => point.x)), y: Math.min(...element.points.map((point) => point.y)) }; }
+export class ElementDragTarget implements Draggable {
+  constructor(private readonly element: CanvasElement) { }
+  get id() { return this.element.id; }
+  position() { return elementPosition(this.element); }
+  moveTo(position: Point) { const origin = elementPosition(this.element); const dx = position.x - origin.x; const dy = position.y - origin.y; if (this.element.type === "path") for (const point of this.element.points) { point.x += dx; point.y += dy; } else { this.element.x += dx; this.element.y += dy; } }
+}
+
+export type BrowserMathJax = { startup?: { promise?: Promise<void>; typeset?: boolean }; svg?: unknown; tex?: unknown; tex2svg?: (source: string, options?: { display?: boolean }) => Element };

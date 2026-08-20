@@ -57,7 +57,7 @@ export interface CanvasBoard {
   links: CanvasLink[];
 }
 
-export interface CanvasBoardDocument {
-  board: CanvasBoard;
-  viewport: CanvasViewport;
-}
+// export interface CanvasBoardDocument {
+//   board: CanvasBoard;
+//   viewport: CanvasViewport;
+// }

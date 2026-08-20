@@ -1,24 +1,22 @@
 import RBush from "rbush";
+import type { CanvasCard } from "../model/card";
+import type { CanvasLink } from "../model/arrow";
+import type { CardIndexItem, ElementIndexItem, LinkIndexItem } from "../types/events";
+import type { CanvasElement } from "../types/elements";
+import { elementBounds, fitElementBounds } from "./utils";
+import { linkBounds } from "../model/helpers";
 
-import type {
-  CanvasCard,
-  CanvasElement,
-  CardIndexItem,
-  ElementIndexItem,
-  LinkIndexItem,
-} from "../types";
 
-import type { CanvasLink } from "../model";
 
-import {
-  elementBounds,
-  fitElementBounds,
-  linkBounds,
-} from "../engine";
 
 export interface CanvasObjectSource {
-  getCard(id: string): CanvasCard | undefined;
-  getLink(id: string): CanvasLink | undefined;
+  getCard(
+    id: string,
+  ): CanvasCard | undefined;
+
+  getLink(
+    id: string,
+  ): CanvasLink | undefined;
 
   cards(): Iterable<CanvasCard>;
   links(): Iterable<CanvasLink>;
@@ -59,10 +57,12 @@ export class CanvasSpatialIndex {
   private cardSpatialIndexDirty = true;
   private linkSpatialIndexDirty = true;
 
+  private readonly objects: CanvasObjectSource;
   constructor(
-    private readonly objects: CanvasObjectSource,
+    objects: CanvasObjectSource,
   ) {
     this.rebuildLinkMap();
+    this.objects = objects
   }
 
   invalidateAll(): void {

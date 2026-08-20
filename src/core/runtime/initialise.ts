@@ -1,4 +1,3 @@
-import { cardsForStorage, normalizeLoadedCards, normalizeLoadedLinks } from "../store/serialization";
 import { CanvasPreferencesController } from "./preferences";
 import { CanvasSelectionController } from "./selection";
 import { CanvasHistoryController } from "./history";
@@ -8,195 +7,29 @@ import { CanvasTextEditor } from "./texteditor";
 import { CanvasScene } from "./scene";
 import { CanvasBoardController } from "./board";
 import { CanvasDetailController } from "./detail";
-import { CanvasPersistence } from "../persistence/persistence";
-import type { CanvasBoard, CanvasBoardDocument, Snapshot } from "../types/canvas";
-import type { CanvasBoardsResponse } from "../types/responses";
-import type { CanvasRuntimeDocument, EndlessCanvasRuntimeOptions } from "../types/runtime";
+import type { CanvasBoardDocument, Snapshot } from "../types/canvas";
+import type { EndlessCanvasRuntimeOptions } from "../types/runtime";
 import { CanvasSpatialIndex, type CanvasObjectSource } from "../engine/spatial";
 import { CanvasBoardRenderer, CanvasDetailRenderer, CanvasRenderer } from "../rendering/render";
 import { screenToWorld } from "../engine/utils";
 import { CanvasInteractionController } from "../interaction/interaction";
-
-
+import { createPersistence } from "../persistence/instance";
+import type { CanvasAssetAdapter } from "./asset";
 
 // ---------------------------------------------------------------------------
 // Persistence
 // ---------------------------------------------------------------------------
-
-
-
-export interface CanvasPersistenceAdapter {
-  loadBoards(): Promise<CanvasBoardsResponse>;
-
-  loadBoard(
-    boardId: string,
-  ): Promise<CanvasBoardDocument>;
-
-  saveBoard(
-    document: CanvasBoardDocument,
-  ): Promise<void>;
-
-  createBoard(
-    name: string,
-  ): Promise<CanvasBoard>;
-
-  renameBoard(
-    boardId: string,
-    name: string,
-  ): Promise<CanvasBoard>;
-
-  duplicateBoard(
-    boardId: string,
-  ): Promise<CanvasBoard>;
-
-  deleteBoard(
-    boardId: string,
-  ): Promise<void>;
-
-  setActiveBoard?(
-    boardId: string,
-  ): Promise<void>;
-}
-
-function createPersistence(
-  options: EndlessCanvasRuntimeOptions,
-  scene: CanvasScene,
-  documentState: CanvasRuntimeDocument,
-  getCurrentBoard: () => CanvasBoard | null,
-) {
-  return new CanvasPersistence({
-    store: {
-      async loadBoards() {
-        const result =
-          await options.persistence.loadBoards();
-
-        return result.boards;
-      },
-
-      async loadBoard(
-        boardId,
-      ) {
-        const boardDocument =
-          await options.persistence.loadBoard(
-            boardId,
-          );
-
-        return {
-          ...boardDocument.board,
-
-          cards:
-            normalizeLoadedCards(
-              boardDocument.board.cards,
-            ),
-
-          links:
-            normalizeLoadedLinks(
-              boardDocument.board.links,
-              boardDocument.board.cards,
-            ),
-        };
-      },
-
-      async saveBoard(
-        board,
-      ) {
-        await options.persistence.saveBoard({
-          board: {
-            id: board.id,
-            name: board.name,
-            cards: cardsForStorage(
-              documentState.snapshotCards(),
-            ),
-
-            links:
-              documentState.snapshotLinks(),
-          },
-
-          viewport: {
-            x:
-              scene.boardViewport.x,
-
-            y:
-              scene.boardViewport.y,
-
-            scale:
-              scene.boardViewport
-                .scale.x,
-          },
-        });
-      },
-
-      createBoard(
-        name,
-      ) {
-        return options.persistence
-          .createBoard(name);
-      },
-
-      renameBoard(
-        boardId,
-        name,
-      ) {
-        return options.persistence
-          .renameBoard(
-            boardId,
-            name,
-          )
-          .then(() => undefined);
-      },
-
-      duplicateBoard(
-        boardId,
-      ) {
-        return options.persistence
-          .duplicateBoard(
-            boardId,
-          );
-      },
-
-      deleteBoard(
-        boardId,
-      ) {
-        return options.persistence
-          .deleteBoard(
-            boardId,
-          );
-      },
-    },
-
-    getCurrentBoard,
-
-    onError(error) {
-      console.warn(
-        "Failed to persist canvas.",
-        error,
-      );
-
-      options.onError?.(
-        error instanceof Error
-          ? error.message
-          : String(error),
-      );
-    },
-  });
-}
 
 export async function initializeCanvasRuntime(
   host: HTMLElement,
   options: EndlessCanvasRuntimeOptions,
 ) {
   const {
-    engine,
+    assets,
+    // engine,
     document: documentState,
-    algorithms,
-    ui,
   } = options;
 
-  const {
-    keyboardShortcut,
-    marqueeSelects,
-    normalizeDragBounds,
-  } = algorithms;
 
   // ---------------------------------------------------------------------------
   // Scene
@@ -208,7 +41,8 @@ export async function initializeCanvasRuntime(
   const cards = documentState.cards;
   const links = documentState.links;
 
-  const persistence = createPersistence(scene, documentState);
+  const getCurrentBoard = (): CanvasBoardDocument => ({ board: { id: "board", name: "board", cards: [], links: [] }, viewport: { x: 0, y: 0, scale: 1 } })
+  const persistence = createPersistence(options, scene, documentState, getCurrentBoard);
   // Shared object source
 
   const objectSource: CanvasObjectSource = {
@@ -415,6 +249,7 @@ export async function initializeCanvasRuntime(
       onBoardsChanged(
         boards,
       ) {
+        console.log(boards)
         // Wire to the existing canvas-library UI here.
       },
     });
@@ -494,11 +329,18 @@ export async function initializeCanvasRuntime(
   // Board controller
   // ---------------------------------------------------------------------------
 
+  //FIX: Fix canvasboardcontroller options
   const boardController =
     new CanvasBoardController({
       scene,
       selection,
+      spatialIndex,
+      source: objectSource,
+      getLink(id) {
 
+      },
+      //@ts-ignore
+      getTextCardElement(card) { },
       getCard(id) {
         return objectSource.getCard(
           id,
@@ -515,10 +357,6 @@ export async function initializeCanvasRuntime(
 
       addLink(link) {
         links.push(link);
-      },
-
-      registerLink(id) {
-        spatialIndex.registerLink(id);
       },
 
       refresh() {
@@ -538,13 +376,12 @@ export async function initializeCanvasRuntime(
         persistence.scheduleSave();
       },
 
-      cardCenter,
 
-      openImagePicker() {
-        ui.slots()
-          .imageFileInput
-          .click();
-      },
+      // openImagePicker() {
+      //   ui.slots()
+      //     .imageFileInput
+      //     .click();
+      // },
     });
 
   // ---------------------------------------------------------------------------
@@ -555,7 +392,12 @@ export async function initializeCanvasRuntime(
     new CanvasDetailController({
       scene,
       selection,
-      clipboard,
+      spatialIndex,
+      assets: assets as CanvasAssetAdapter,
+      textEditor,
+      captureInteractionSnapshot,
+      //@ts-ignore
+      textIndexAtPoint(element, point) { },
 
       activeCard() {
         const id =
@@ -644,13 +486,12 @@ export async function initializeCanvasRuntime(
       selection,
       board: boardController,
 
-      createCardView,
+      //@ts-ignore
+      createCardView(card) { },
+      updateCardView(view, card, selected) { },
+      drawLink(graphics, link, selected, hovered) { },
+      drawDragPreview(graphics, drag) { }
 
-      updateCardView,
-
-      drawLink,
-
-      drawDragPreview,
     });
 
   const detailRenderer =
@@ -669,13 +510,11 @@ export async function initializeCanvasRuntime(
           : undefined;
       },
 
-      renderElement,
+      renderElement(container, element, selected) { },
+      renderElementArrows(container, card) { },
+      renderSelection(container, card) { },
+      renderGrid(graphics, card, scale, origin) { },
 
-      renderElementArrows,
-
-      renderSelection,
-
-      renderGrid,
     });
 
   // If your CanvasRenderer constructor expects TWO arguments:
@@ -877,8 +716,8 @@ export async function initializeCanvasRuntime(
     boardRenderer.clear();
     detailRenderer.clear();
 
-    ui.closeInlineEditor();
-    ui.disconnect();
+    // ui.closeInlineEditor();
+    // ui.disconnect();
 
     scene.destroy();
   };

@@ -1,8 +1,8 @@
 import type { CanvasEngine } from "../engine/utils";
 import type { CanvasLink } from "../model/arrow";
 import type { CanvasCard } from "../model/card";
+import type { CanvasPersistenceAdapter } from "../persistence/instance";
 import type { CanvasAssetAdapter } from "../runtime/asset";
-import type { CanvasPersistenceAdapter } from "../runtime/initialise";
 import type { CanvasPreferences } from "../runtime/preferences";
 import type { CanvasBoard, CanvasViewport } from "./canvas";
 

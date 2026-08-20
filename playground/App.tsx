@@ -1,11 +1,52 @@
+import type { EndlessCanvasRuntimeOptions } from '@/core/types/runtime';
 import './App.css'
 import { EndlessCanvas } from "@productivity-os/canvas/react";
+import { CanvasEngine } from '@/core/engine/utils';
 
 function App() {
+  const options =
+    useMemo<
+      EndlessCanvasRuntimeOptions
+    >(
+      () => ({
+        engine:
+          new CanvasEngine(),
+
+        document:
+          new CanvasRuntimeDocument(),
+
+        algorithms:
+          canvasAlgorithms,
+
+        ui:
+          canvasUi,
+
+        persistence:
+          canvasPersistenceAdapter,
+
+        assets:
+          canvasAssetAdapter,
+
+        preferences:
+          canvasPreferences,
+
+        onError(message) {
+          console.error(
+            message,
+          );
+        },
+      }),
+      [],
+    );
 
   return (
     <>
-      <EndlessCanvas />
+      <EndlessCanvas
+        style={{
+          width: "100vw",
+          height: "100vh",
+        }}
+        options={options} />
     </>
   )
 }

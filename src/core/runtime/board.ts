@@ -31,7 +31,7 @@ export interface CanvasBoardControllerOptions {
   scene: CanvasScene;
   selection: CanvasSelectionController;
   spatialIndex: CanvasSpatialIndex;
-  objects: CanvasObjectSource;
+  source: CanvasObjectSource;
 
   getCard(id: string): CanvasCard | undefined;
   getLink(id: string): CanvasLink | undefined;
@@ -1049,7 +1049,7 @@ export class CanvasBoardController {
       );
 
     const cards = [
-      ...this.options.objects.cards(),
+      ...this.options.source.cards(),
     ];
 
     for (

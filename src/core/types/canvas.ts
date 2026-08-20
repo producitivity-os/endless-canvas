@@ -1,8 +1,9 @@
-import type { Container, Graphics, Point } from "pixi.js";
+import type { Container, Graphics } from "pixi.js";
 import type { CanvasLink, ElementArrow } from "../model/arrow";
 import type { CanvasElement } from "./elements";
 import type { CanvasCard } from "../model/card";
 import type { LinkHead, LinkRouting } from "./events";
+import type { Point } from "./geometry";
 
 export interface CanvasHealthStatus {
   healthy: boolean;

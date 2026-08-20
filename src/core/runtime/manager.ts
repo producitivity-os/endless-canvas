@@ -86,27 +86,27 @@ export class CanvasBoardManager {
   async create(
     name = "Untitled Canvas",
   ): Promise<CanvasBoardDocument> {
-    const board =
+    const boardDocument =
       await this.options.persistence.createBoard(
         name,
       );
 
     this.boards.push({
-      id: board.id,
-      name: board.name,
+      id: boardDocument.board.id,
+      name: boardDocument.board.name,
     });
 
-    this.activeBoardId = board.id;
+    this.activeBoardId = boardDocument.board.id;
 
     this.options.onBoardsChanged?.(
       this.boards,
     );
 
     this.options.onBoardChanged?.(
-      board,
+      boardDocument,
     );
 
-    return board;
+    return boardDocument;
   }
 
   async rename(
@@ -142,12 +142,12 @@ export class CanvasBoardManager {
       );
 
     this.boards.push({
-      id: duplicate.id,
-      name: duplicate.name,
+      id: duplicate.board.id,
+      name: duplicate.board.name,
     });
 
     this.activeBoardId =
-      duplicate.id;
+      duplicate.board.id;
 
     this.options.onBoardsChanged?.(
       this.boards,

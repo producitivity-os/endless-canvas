@@ -1,7 +1,4 @@
-import type {
-  CanvasBoardDocument,
-  CanvasBoardSummary,
-} from "../types";
+import type { CanvasBoardDocument, CanvasBoardSummary } from "../types/canvas";
 
 export interface CanvasPersistenceStore {
   loadBoards():
@@ -71,12 +68,14 @@ export class CanvasPersistence {
 
   private readonly saveDelayMs: number;
 
+  private readonly options:
+    CanvasPersistenceOptions
   constructor(
-    private readonly options:
-      CanvasPersistenceOptions,
+    options: CanvasPersistenceOptions
   ) {
     this.saveDelayMs =
       options.saveDelayMs ?? 300;
+    this.options = options
   }
 
   async loadBoards():

@@ -1,14 +1,16 @@
-import { normalizeImageUrl } from "@/api/canvas";
-import { CanvasLink, createCard, createTextElement, type CanvasCard, type CanvasCardInit, type CanvasLink as CanvasLinkType, type CanvasViewport, type LinkRouting, type TextElementInit } from "@/features/canvas/model";
+import { CanvasLink, type CanvasLinkInit } from "../model/arrow";
+import type { CanvasCard } from "../model/card";
+import type { CanvasCardInit, CanvasViewport } from "../types/canvas";
+import type { Point } from "../types/geometry";
 
 export function isValidViewport(value: CanvasViewport | undefined): value is CanvasViewport {
   return Boolean(value) && Number.isFinite(value?.x) && Number.isFinite(value?.y) && Number.isFinite(value?.scale) && value!.scale > 0;
 }
 
-export function cloneCards(cards: Array<CanvasCard | CanvasCardInit>) {
-  const next = (structuredClone(cards) as unknown as CanvasCardInit[]).map(createCard);
-  for (const card of next) card.elements = card.elements.map((element) => element.type === "text" ? createTextElement(element as unknown as TextElementInit) : element);
-  return next;
+export function cloneCards(
+  cards: CanvasCard[],
+): CanvasCard[] {
+  return structuredClone(cards);
 }
 
 export function cardsAsPlainData(cards: CanvasCard[]) { return JSON.parse(JSON.stringify(cards)) as CanvasCardInit[]; }
@@ -25,7 +27,102 @@ export function normalizeLoadedCards(cards: CanvasCard[]) {
   return next;
 }
 
-export function normalizeLoadedLinks(value: CanvasLinkType[], cards: CanvasCard[]): CanvasLink[] {
-  const cardIds = new Set(cards.map((card) => card.id));
-  return value.filter((link) => link && cardIds.has(link.fromId) && cardIds.has(link.toId) && link.fromId !== link.toId).map((link) => new CanvasLink({ id: link.id || crypto.randomUUID(), fromId: link.fromId, toId: link.toId, routing: (link.routing === "straight" || link.routing === "orthogonal" ? link.routing : "bezier") as LinkRouting, startHead: ["triangle", "triangle-outline", "chicken"].includes(link.startHead) ? link.startHead : "none", endHead: ["triangle", "triangle-outline", "chicken"].includes(link.endHead) ? link.endHead : "none", fromAnchor: link.fromAnchor ?? { x: 0.5, y: 0.5 }, toAnchor: link.toAnchor ?? { x: 0.5, y: 0.5 }, bend: Number.isFinite(link.bend) ? link.bend : 0, strokeWidth: Number.isFinite(link.strokeWidth) ? link.strokeWidth : 2.8, label: link.label }));
+export function normalizeImageUrl(
+  src: string,
+): string {
+  if (!src) {
+    return "";
+  }
+
+  const value = src.trim();
+
+  if (
+    value.startsWith("data:") ||
+    value.startsWith("blob:") ||
+    value.startsWith("http://") ||
+    value.startsWith("https://") ||
+    value.startsWith("file://") ||
+    value.startsWith("asset://")
+  ) {
+    return value;
+  }
+
+  return value;
+}
+
+export function normalizeLoadedLinks(
+  value: CanvasLinkInit[],
+  cards: CanvasCard[],
+): CanvasLink[] {
+  const cardIds =
+    new Set(
+      cards.map((card) => card.id),
+    );
+
+  return value
+    .filter(
+      (link) =>
+        cardIds.has(link.fromId) &&
+        cardIds.has(link.toId) &&
+        link.fromId !== link.toId,
+    )
+    .map(
+      (link) =>
+        new CanvasLink({
+          ...link,
+
+          id:
+            link.id ??
+            crypto.randomUUID(),
+
+          routing:
+            link.routing === "straight" ||
+              link.routing === "orthogonal"
+              ? link.routing
+              : "bezier",
+
+          startHead:
+            link.startHead === "triangle" ||
+              link.startHead === "triangle-outline" ||
+              link.startHead === "chicken"
+              ? link.startHead
+              : "none",
+
+          endHead:
+            link.endHead === "triangle" ||
+              link.endHead === "triangle-outline" ||
+              link.endHead === "chicken"
+              ? link.endHead
+              : "none",
+
+          fromAnchor:
+            link.fromAnchor ??
+            {
+              x: 0.5,
+              y: 0.5,
+            } as Point,
+
+          toAnchor:
+            link.toAnchor ??
+            {
+              x: 0.5,
+              y: 0.5,
+            },
+
+          bend:
+            Number.isFinite(link.bend)
+              ? link.bend
+              : 0,
+
+          strokeWidth:
+            Number.isFinite(
+              link.strokeWidth,
+            )
+              ? link.strokeWidth
+              : 2.8,
+
+          label:
+            link.label ?? "",
+        }),
+    );
 }

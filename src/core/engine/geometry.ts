@@ -1,17 +1,7 @@
-import { Point } from "../types";
+import type { ResizeCorner, Point } from "../types";
+import type { Bounds } from "./spatial";
 
-export type ResizeCorner =
-  | "topLeft"
-  | "topRight"
-  | "bottomRight"
-  | "bottomLeft";
 
-export type Bounds = {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-};
 
 export function resizeBoundsFromCorner(
   corner: ResizeCorner,

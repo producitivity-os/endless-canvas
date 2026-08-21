@@ -1,11 +1,12 @@
 import type { EndlessCanvasRuntimeOptions } from '@/core/types/runtime';
 import './App.css'
 import { EndlessCanvas } from "@productivity-os/canvas/react";
-import { CanvasEngine } from '@/core/engine/utils';
+import { useMemo } from 'react';
+import { CanvasEngine } from '@/core';
 
 function App() {
   const options =
-    useMemo<
+    useMemo(factory, deps)<
       EndlessCanvasRuntimeOptions
     >(
       () => ({

@@ -4,25 +4,18 @@ import {
 } from "pixi.js";
 
 import type {
-  CanvasCard,
   CanvasElement,
+  BoardDrag,
 } from "../types";
+import { CanvasCard, CanvasLink } from "../model";
+import type { CanvasObjectSource } from "../engine";
+import type { CanvasBoardController, CanvasDetailController, CanvasScene, CanvasSelectionController } from "../runtime";
 
-import { CanvasLink } from "../model";
-import { CanvasObjectSource } from "./spatial";
-import { CanvasSelectionController } from "./selection";
-import { CanvasScene } from "./scene";
-import { CanvasBoardController } from "./board";
-import { CanvasDetailController } from "./detail";
+
+
 export type CanvasViewMode =
   | "board"
   | "detail";
-
-
-import type {
-  BoardDrag,
-} from "../types";
-
 
 export interface CanvasBoardRendererOptions {
   scene: CanvasScene;
@@ -57,10 +50,14 @@ export class CanvasBoardRenderer {
   private readonly cardViews =
     new Map<string, Container>();
 
+
+  private readonly options:
+    CanvasBoardRendererOptions
   constructor(
-    private readonly options:
-      CanvasBoardRendererOptions,
-  ) { }
+    options: CanvasBoardRendererOptions
+  ) {
+    this.options = options
+  }
 
   render(): void {
     this.syncCardViews();
@@ -234,10 +231,14 @@ export interface CanvasDetailRendererOptions {
 }
 
 export class CanvasDetailRenderer {
+
+  private readonly options:
+    CanvasDetailRendererOptions;
   constructor(
-    private readonly options:
-      CanvasDetailRendererOptions,
-  ) { }
+    options: CanvasDetailRendererOptions
+  ) {
+    this.options = options
+  }
 
   render(): void {
     const card =
@@ -359,13 +360,19 @@ export class CanvasDetailRenderer {
 }
 
 export class CanvasRenderer {
-  constructor(
-    private readonly board:
-      CanvasBoardRenderer,
 
-    private readonly detail:
-      CanvasDetailRenderer,
-  ) { }
+  private readonly board:
+    CanvasBoardRenderer;
+
+  private readonly detail:
+    CanvasDetailRenderer;
+  constructor(
+    board: CanvasBoardRenderer,
+    detail: CanvasDetailRenderer
+  ) {
+    this.board = board
+    this.detail = detail
+  }
 
   render(
     mode: CanvasViewMode,

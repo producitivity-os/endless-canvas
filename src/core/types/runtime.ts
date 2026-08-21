@@ -1,10 +1,9 @@
-import type { CanvasEngine } from "../engine/utils";
-import type { CanvasLink } from "../model/arrow";
-import type { CanvasCard } from "../model/card";
-import type { CanvasPersistenceAdapter } from "../persistence/instance";
-import type { CanvasAssetAdapter } from "../runtime/asset";
-import type { CanvasPreferences } from "../runtime/preferences";
+import type { CanvasEngine } from "../engine";
+import type { CanvasLink, CanvasCard } from "../model";
+import type { CanvasPersistenceAdapter } from "../persistence";
+import type { CanvasAssetAdapter, CanvasPreferences } from "../runtime";
 import type { CanvasBoard, CanvasViewport } from "./canvas";
+
 
 export type EndlessCanvasRuntimeOptions = {
   engine: CanvasEngine;

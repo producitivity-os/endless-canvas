@@ -35,7 +35,6 @@ export class BaseArrow extends Arrow {
   }
 }
 export class ElementArrow extends BaseArrow {
-  id: string;
   fromElementId: string; toElementId: string; constructor(init: LinkAppearanceInit & { fromElementId: string; toElementId: string }) { super(init); this.fromElementId = init.fromElementId; this.toElementId = init.toElementId; this.connectedElementIds = [init.fromElementId, init.toElementId]; }
 }
 

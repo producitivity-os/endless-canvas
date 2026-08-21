@@ -1,5 +1,5 @@
 import { Container, Graphics, Rectangle } from "pixi.js";
-import { CanvasEngine, fitElementBounds, fittedCardPadding, illustrationCardPadding, minCardHeight, minCardWidth } from "../engine/utils";
+import { fitElementBounds, fittedCardPadding, illustrationCardPadding, minCardHeight, minCardWidth } from "../engine/utils";
 import type { CanvasCardInit, CardView } from "../types/canvas";
 import type { CanvasElement } from "../types/elements";
 import type { CardIndexItem } from "../types/events";
@@ -7,6 +7,7 @@ import { ElementArrow } from "./arrow";
 import { hydrateElement, renderStaticIllustrationArrows } from "./helpers";
 import { TextElement, type TextElementInit } from "./text";
 import { CARD_FILL, CARD_SELECTED, CARD_STROKE } from "../constants/constants";
+import type { CanvasEngine } from "../engine";
 
 type CardRenderOptions = {
   selected?: boolean;

@@ -1,7 +1,4 @@
-export interface UploadedCanvasImage {
-  url: string;
-  name: string;
-}
+import type { UploadedCanvasImage } from "../types";
 
 export interface CanvasAssetAdapter {
   uploadImage(

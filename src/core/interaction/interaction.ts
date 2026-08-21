@@ -1,10 +1,5 @@
+import type { CanvasBoardController, CanvasDetailController, CanvasHistoryController, CanvasScene, CanvasSelectionController, CanvasTextEditor } from "../runtime";
 import type { Point } from "../types";
-import { CanvasBoardController } from "./board";
-import { CanvasDetailController } from "./detail";
-import { CanvasHistoryController } from "./history";
-import { CanvasScene } from "./scene";
-import { CanvasSelectionController } from "./selection";
-import { CanvasTextEditor } from "./texteditor";
 
 
 export type CanvasInteractionMode =
@@ -84,10 +79,13 @@ export class CanvasInteractionController {
 
   private destroyed = false;
 
+  private readonly options:
+    CanvasInteractionControllerOptions;
   constructor(
-    private readonly options:
-      CanvasInteractionControllerOptions,
-  ) { }
+    options: CanvasInteractionControllerOptions
+  ) {
+    this.options = options
+  }
 
   attach(): void {
     const canvas =

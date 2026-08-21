@@ -1,8 +1,6 @@
 import type { CanvasScene } from "../runtime/scene";
-import { cardsForStorage, normalizeLoadedCards, normalizeLoadedLinks } from "../store/serialization";
-import type { CanvasBoard, CanvasBoardDocument } from "../types/canvas";
-import type { CanvasBoardsResponse } from "../types/responses";
-import type { CanvasRuntimeDocument, EndlessCanvasRuntimeOptions } from "../types/runtime";
+import { cardsForStorage, normalizeLoadedCards, normalizeLoadedLinks } from "../store";
+import type { CanvasBoardsResponse, CanvasBoard, CanvasBoardDocument, CanvasRuntimeDocument, EndlessCanvasRuntimeOptions } from "../types";
 import { CanvasPersistence } from "./persistence";
 
 export interface CanvasPersistenceAdapter {

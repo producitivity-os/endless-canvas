@@ -72,10 +72,14 @@ export type Snapshot = {
   mode: "board" | "detail";
 };
 
-export type CanvasBoardSummary = {
+export interface CanvasBoardSummary {
   id: string;
   name: string;
-};
+  createdAt?: number;
+  updatedAt?: number;
+}
+
+
 
 export type CanvasBoardDocument = {
   board: CanvasBoard;

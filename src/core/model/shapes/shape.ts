@@ -1,9 +1,12 @@
-import type { CanvasElement } from "@/core/types/types";
-import type { Point } from "pixi.js";
+import type { BaseElement } from "../types/elements";
+import { Element } from "./element";
 
-export class PathElement {
-  readonly type = "path" as const;
-  id: string; points: Point[]; color: number; width: number; rotation?: number;
-  constructor(init: Extract<CanvasElement, { type: "path" }>) { this.id = init.id; this.points = init.points; this.color = init.color; this.width = init.width; this.rotation = init.rotation; }
-  translate(dx: number, dy: number) { for (const point of this.points) { point.x += dx; point.y += dy; } }
+export type ShapeInit = BaseElement & { fill: number; stroke: number; strokeWidth?: number; opacity?: number; fillStyle?: "solid" | "hachure" | "cross-hatch" | "none" };
+
+export abstract class Shape extends Element {
+  fill: number; stroke: number; strokeWidth?: number; opacity?: number; fillStyle?: "solid" | "hachure" | "cross-hatch" | "none";
+
+  protected constructor(init: ShapeInit) {
+    super(init); this.fill = init.fill; this.stroke = init.stroke; this.strokeWidth = init.strokeWidth; this.opacity = init.opacity; this.fillStyle = init.fillStyle;
+  }
 }

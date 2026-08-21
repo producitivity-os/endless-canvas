@@ -13,7 +13,7 @@
     "allowArbitraryExtensions": true,
     "skipLibCheck": true,
     "paths": {
-      "@/*": [
+      "@endless-canvas/*": [
         "./src/*"
       ]
     },

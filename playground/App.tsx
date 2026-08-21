@@ -1,55 +1,43 @@
-import type { EndlessCanvasRuntimeOptions } from '@/core/types/runtime';
-import './App.css'
-import { EndlessCanvas } from "@productivity-os/canvas/react";
-import { useMemo } from 'react';
-import { CanvasEngine } from '@/core';
+import type {
+  CanvasAssetAdapter,
+  EndlessCanvasOptions,
+  UploadedCanvasImage,
+} from "@endless-canvas/core";
+import "./App.css";
+import { EndlessCanvas } from "@endless-canvas/react";
+import { useState } from "react";
+import { CanvasToolbar, type CanvasTool } from "./components/Toolbar";
+
+const onError = (error: unknown) => {
+  console.warn("Failed to persist canvas.", error);
+};
+
+const onChange = () => {};
+
+const assets: CanvasAssetAdapter = {
+  uploadImage: function (dataUrl: string, name: string): Promise<UploadedCanvasImage> {
+    throw new Error("Function not implemented.");
+  },
+};
 
 function App() {
-  const options =
-    useMemo(factory, deps)<
-      EndlessCanvasRuntimeOptions
-    >(
-      () => ({
-        engine:
-          new CanvasEngine(),
+  const options: EndlessCanvasOptions = {};
 
-        document:
-          new CanvasRuntimeDocument(),
-
-        algorithms:
-          canvasAlgorithms,
-
-        ui:
-          canvasUi,
-
-        persistence:
-          canvasPersistenceAdapter,
-
-        assets:
-          canvasAssetAdapter,
-
-        preferences:
-          canvasPreferences,
-
-        onError(message) {
-          console.error(
-            message,
-          );
-        },
-      }),
-      [],
-    );
+  const [mode, setMode] = useState<CanvasTool>("select");
 
   return (
-    <>
+    <div className="relative h-screen w-screen overflow-hidden bg-zinc-950">
       <EndlessCanvas
-        style={{
-          width: "100vw",
-          height: "100vh",
-        }}
-        options={options} />
-    </>
-  )
+        className="w-full h-full"
+        mode={mode}
+        onError={onError}
+        onChange={onChange}
+        options={options}
+      />
+
+      <CanvasToolbar value={mode} onChange={setMode} className="canvas-toolbar absolute top-0" />
+    </div>
+  );
 }
 
-export default App
+export default App;

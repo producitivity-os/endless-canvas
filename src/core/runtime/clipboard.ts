@@ -1,7 +1,6 @@
 import type { CanvasCard } from "../model/card";
 import { createTextElement, type TextElementInit } from "../model/text";
 import type { CanvasElement } from "../types/elements";
-import { translateElement } from "./scene";
 
 export class CanvasClipboard {
   private card: CanvasCard | null = null;
@@ -33,14 +32,8 @@ export class CanvasClipboard {
     this.card = this.cloneCard(card);
   }
 
-  copyElements(
-    elements: Iterable<CanvasElement>,
-  ): void {
-    this.elements = Array.from(
-      elements,
-      (element) =>
-        this.cloneElement(element),
-    );
+  copyElements(elements: Iterable<CanvasElement>): void {
+    this.elements = Array.from(elements, (element) => this.cloneElement(element));
   }
 
   pasteCard(): CanvasCard | null {
@@ -48,8 +41,7 @@ export class CanvasClipboard {
       return null;
     }
 
-    const card =
-      this.cloneCard(this.card);
+    const card = this.cloneCard(this.card);
 
     card.id = crypto.randomUUID();
 
@@ -71,38 +63,30 @@ export class CanvasClipboard {
 
       clone.id = crypto.randomUUID();
 
-      translateElement(
-        clone,
-        offset.x,
-        offset.y,
-      );
+      //FIX: Uncomment this
+      // translateElement(
+      //   clone,
+      //   offset.x,
+      //   offset.y,
+      // );
 
       return clone;
     });
 
-    this.elements = pasted.map((element) =>
-      this.cloneElement(element),
-    );
+    this.elements = pasted.map((element) => this.cloneElement(element));
 
     return pasted;
   }
 
-  private cloneCard(
-    card: CanvasCard,
-  ): CanvasCard {
+  private cloneCard(card: CanvasCard): CanvasCard {
     return structuredClone(card);
   }
 
-  private cloneElement(
-    element: CanvasElement,
-  ): CanvasElement {
-    const clone =
-      structuredClone(element);
+  private cloneElement(element: CanvasElement): CanvasElement {
+    const clone = structuredClone(element);
 
     if (clone.type === "text") {
-      return createTextElement(
-        clone as TextElementInit,
-      );
+      return createTextElement(clone as TextElementInit);
     }
 
     return clone;

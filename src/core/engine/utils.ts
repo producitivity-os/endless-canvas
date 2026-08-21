@@ -17,39 +17,6 @@ export function normalizeBounds(x1: number, y1: number, x2: number, y2: number) 
   return { x: Math.min(x1, x2), y: Math.min(y1, y2), width: Math.abs(x2 - x1), height: Math.abs(y2 - y1) };
 }
 
-// export function resizeBoundsFromCorner(
-//   corner: ResizeCorner,
-//   origin: { x: number; y: number; width: number; height: number },
-//   point: Point,
-//   minWidth: number,
-//   minHeight: number,
-//   preserveAspect: boolean,
-// ) {
-//   const right = origin.x + origin.width;
-//   const bottom = origin.y + origin.height;
-//   if (!preserveAspect) {
-//     const raw = corner === "topLeft"
-//       ? { x1: point.x, y1: point.y, x2: right, y2: bottom }
-//       : corner === "topRight"
-//         ? { x1: origin.x, y1: point.y, x2: point.x, y2: bottom }
-//         : corner === "bottomLeft"
-//           ? { x1: point.x, y1: origin.y, x2: right, y2: point.y }
-//           : { x1: origin.x, y1: origin.y, x2: point.x, y2: point.y };
-//     const bounds = normalizeBounds(raw.x1, raw.y1, raw.x2, raw.y2);
-//     return { x: bounds.x, y: bounds.y, width: Math.max(minWidth, bounds.width), height: Math.max(minHeight, bounds.height) };
-//   }
-//
-//   const ratio = origin.width / Math.max(1, origin.height);
-//   const opposite = corner === "topLeft" ? { x: right, y: bottom } : corner === "topRight" ? { x: origin.x, y: bottom } : corner === "bottomLeft" ? { x: right, y: origin.y } : { x: origin.x, y: origin.y };
-//   let width = Math.max(minWidth, Math.abs(point.x - opposite.x));
-//   let height = Math.max(minHeight, Math.abs(point.y - opposite.y));
-//   if (width / height > ratio) height = width / ratio;
-//   else width = height * ratio;
-//   const leftSide = corner === "topLeft" || corner === "bottomLeft";
-//   const topSide = corner === "topLeft" || corner === "topRight";
-//   return { x: leftSide ? opposite.x - width : opposite.x, y: topSide ? opposite.y - height : opposite.y, width, height };
-// }
-
 type Bounds = { x: number; y: number; width: number; height: number };
 
 export function pointInBounds(point: Point, bounds: Bounds) {

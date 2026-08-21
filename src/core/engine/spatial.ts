@@ -7,8 +7,6 @@ import { elementBounds, fitElementBounds } from "./utils";
 import { linkBounds } from "../model/helpers";
 
 
-
-
 export interface CanvasObjectSource {
   getCard(
     id: string,

@@ -9,17 +9,10 @@ export interface CanvasHealthStatus {
   healthy: boolean;
 }
 
-export interface CanvasBoard {
-  id: string;
-  name: string;
-
+export interface EndlessCanvasState {
   cards: CanvasCard[];
   links: CanvasLink[];
-
-  createdAt?: number;
-  updatedAt?: number;
 }
-
 
 export type CanvasCardInit = {
   id: string;
@@ -47,7 +40,11 @@ export type LinkAppearanceInit = {
 };
 
 export type LinkNode = { x: number; y: number; width: number; height: number };
-export type CanvasViewport = { x: number; y: number; scale: number };
+export class CanvasViewportState {
+  x = 0;
+  y = 0;
+  scale = 1;
+}
 export type CanvasLibraryView = "all" | "recents" | "drafts";
 export type CanvasIconName = "network" | "book" | "pen" | "grid";
 
@@ -61,31 +58,3 @@ export type CardView = {
   bottomRightHandle: Graphics;
   contentSignature?: string;
 };
-
-export type Snapshot = {
-  cards: CanvasCard[];
-  links: CanvasLink[];
-  selectedCardId: string;
-  selectedCardIds: string[];
-  selectedLinkIds: string[];
-  selectedElementIds: string[];
-  mode: "board" | "detail";
-};
-
-export interface CanvasBoardSummary {
-  id: string;
-  name: string;
-  createdAt?: number;
-  updatedAt?: number;
-}
-
-
-
-export type CanvasBoardDocument = {
-  board: CanvasBoard;
-  viewport: CanvasViewport;
-
-};
-
-
-

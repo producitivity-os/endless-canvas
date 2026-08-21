@@ -1,563 +1,116 @@
-import type { CanvasBoardController, CanvasDetailController, CanvasHistoryController, CanvasScene, CanvasSelectionController, CanvasTextEditor } from "../runtime";
+import type { CanvasController } from "../runtime";
 import type { Point } from "../types";
 
+interface SafariGestureEvent extends Event {
+  scale: number;
+  rotation: number;
 
-export type CanvasInteractionMode =
-  | "board"
-  | "detail";
-
-export interface CanvasInteractionControllerOptions {
-  scene: CanvasScene;
-
-  board: CanvasBoardController;
-  detail: CanvasDetailController;
-
-  selection: CanvasSelectionController;
-  textEditor: CanvasTextEditor;
-
-  history: CanvasHistoryController<unknown>;
-
-  mode(): CanvasInteractionMode;
-
-  screenPoint(
-    event: PointerEvent,
-  ): Point;
-
-  screenToBoard(
-    point: Point,
-  ): Point;
-
-  screenToDetail(
-    point: Point,
-  ): Point;
-
-  boardPointerDown(
-    point: Point,
-    event: PointerEvent,
-  ): void;
-
-  boardPointerMove(
-    point: Point,
-    event: PointerEvent,
-  ): void;
-
-  boardPointerUp(
-    point: Point,
-    event: PointerEvent,
-  ): void;
-
-  detailPointerDown(
-    point: Point,
-    event: PointerEvent,
-  ): void;
-
-  detailPointerMove(
-    point: Point,
-    event: PointerEvent,
-  ): void;
-
-  detailPointerUp(
-    point: Point,
-    event: PointerEvent,
-  ): void;
-
-  boardWheel?(
-    event: WheelEvent,
-  ): void;
-
-  detailWheel?(
-    event: WheelEvent,
-  ): void;
-
-  refresh(): void;
+  clientX: number;
+  clientY: number;
 }
-
+export interface CanvasInteractionControllerOptions {
+  el: HTMLDivElement;
+  controller: CanvasController;
+}
 export class CanvasInteractionController {
-  private pointerId:
-    | number
-    | null = null;
+  private readonly options: CanvasInteractionControllerOptions;
+  private gestureStartScale = 1;
 
-  private destroyed = false;
-
-  private readonly options:
-    CanvasInteractionControllerOptions;
-  constructor(
-    options: CanvasInteractionControllerOptions
-  ) {
-    this.options = options
+  constructor(options: CanvasInteractionControllerOptions) {
+    this.options = options;
   }
 
   attach(): void {
-    const canvas =
-      this.options.scene.canvas;
+    const canvas = this.options.el;
 
-    canvas.addEventListener(
-      "pointerdown",
-      this.onPointerDown,
-    );
-
-    window.addEventListener(
-      "pointermove",
-      this.onPointerMove,
-    );
-
-    window.addEventListener(
-      "pointerup",
-      this.onPointerUp,
-    );
-
-    canvas.addEventListener(
-      "wheel",
-      this.onWheel,
-      {
-        passive: false,
-      },
-    );
-
-    window.addEventListener(
-      "keydown",
-      this.onKeyDown,
-    );
+    canvas.addEventListener("pointerdown", this.onPointerDown);
+    canvas.addEventListener("pointermove", this.onPointerMove);
+    canvas.addEventListener("pointerup", this.onPointerUp);
+    canvas.addEventListener("wheel", this.onWheel, {
+      passive: false,
+    });
+    canvas.addEventListener("gesturestart", this.onGestureStart as EventListener, {
+      passive: false,
+    });
+    canvas.addEventListener("gesturechange", this.onGestureChange as EventListener, {
+      passive: false,
+    });
+    canvas.addEventListener("gestureend", this.onGestureEnd as EventListener, {
+      passive: false,
+    });
   }
 
   detach(): void {
-    const canvas =
-      this.options.scene.canvas;
+    const canvas = this.options.el;
 
-    canvas.removeEventListener(
-      "pointerdown",
-      this.onPointerDown,
-    );
-
-    window.removeEventListener(
-      "pointermove",
-      this.onPointerMove,
-    );
-
-    window.removeEventListener(
-      "pointerup",
-      this.onPointerUp,
-    );
-
-    canvas.removeEventListener(
-      "wheel",
-      this.onWheel,
-    );
-
-    window.removeEventListener(
-      "keydown",
-      this.onKeyDown,
-    );
-
-    this.destroyed = true;
+    canvas.removeEventListener("pointerdown", this.onPointerDown);
+    canvas.removeEventListener("pointermove", this.onPointerMove);
+    canvas.removeEventListener("pointerup", this.onPointerUp);
+    canvas.removeEventListener("wheel", this.onWheel);
+    canvas.removeEventListener("gesturestart", this.onGestureStart as EventListener);
+    canvas.removeEventListener("gesturechange", this.onGestureChange as EventListener);
+    canvas.removeEventListener("gestureend", this.onGestureEnd as EventListener);
   }
 
-  private readonly onPointerDown = (
-    event: PointerEvent,
-  ): void => {
-    if (this.destroyed) {
-      return;
-    }
-
-    this.pointerId =
-      event.pointerId;
-
-    this.options.scene.canvas
-      .setPointerCapture?.(
-        event.pointerId,
-      );
-
-    const screen =
-      this.options.screenPoint(
-        event,
-      );
-
-    if (
-      this.options.mode() ===
-      "detail"
-    ) {
-      const point =
-        this.options.screenToDetail(
-          screen,
-        );
-
-      this.options.detailPointerDown(
-        point,
-        event,
-      );
-
-      return;
-    }
-
-    const point =
-      this.options.screenToBoard(
-        screen,
-      );
-
-    this.options.boardPointerDown(
-      point,
-      event,
-    );
+  private onPointerDown = (event: PointerEvent): void => {
+    this.options.controller.pointerDown(this.screenPoint(event), event);
   };
 
-  private readonly onPointerMove = (
-    event: PointerEvent,
-  ): void => {
-    if (
-      this.destroyed ||
-      (
-        this.pointerId !== null &&
-        event.pointerId !==
-        this.pointerId
-      )
-    ) {
-      return;
-    }
-
-    const screen =
-      this.options.screenPoint(
-        event,
-      );
-
-    if (
-      this.options.mode() ===
-      "detail"
-    ) {
-      this.options.detailPointerMove(
-        this.options.screenToDetail(
-          screen,
-        ),
-        event,
-      );
-
-      return;
-    }
-
-    this.options.boardPointerMove(
-      this.options.screenToBoard(
-        screen,
-      ),
-      event,
-    );
+  private onPointerMove = (event: PointerEvent): void => {
+    this.options.controller.pointerMove(this.screenPoint(event), event);
   };
 
-  private readonly onPointerUp = (
-    event: PointerEvent,
-  ): void => {
-    if (
-      this.destroyed ||
-      (
-        this.pointerId !== null &&
-        event.pointerId !==
-        this.pointerId
-      )
-    ) {
-      return;
-    }
-
-    const screen =
-      this.options.screenPoint(
-        event,
-      );
-
-    if (
-      this.options.mode() ===
-      "detail"
-    ) {
-      this.options.detailPointerUp(
-        this.options.screenToDetail(
-          screen,
-        ),
-        event,
-      );
-    } else {
-      this.options.boardPointerUp(
-        this.options.screenToBoard(
-          screen,
-        ),
-        event,
-      );
-    }
-
-    this.options.scene.canvas
-      .releasePointerCapture?.(
-        event.pointerId,
-      );
-
-    this.pointerId = null;
+  private onPointerUp = (event: PointerEvent): void => {
+    this.options.controller.pointerUp(this.screenPoint(event), event);
   };
 
-  private readonly onWheel = (
-    event: WheelEvent,
-  ): void => {
-    if (this.destroyed) {
-      return;
-    }
-
+  private onWheel = (event: WheelEvent): void => {
     event.preventDefault();
 
-    if (
-      this.options.mode() ===
-      "detail"
-    ) {
-      this.options.detailWheel?.(
-        event,
-      );
+    const point = this.screenPoint(event);
+
+    // Trackpad pinch zoom.
+    if (event.ctrlKey) {
+      this.options.controller.zoomAt(point, event.deltaY);
 
       return;
     }
 
-    this.options.boardWheel?.(
-      event,
-    );
+    // Two-finger trackpad pan.
+    this.options.controller.panBy(-event.deltaX, -event.deltaY);
   };
 
-  private readonly onKeyDown = (
-    event: KeyboardEvent,
-  ): void => {
-    if (this.destroyed) {
-      return;
-    }
+  private screenPoint(event: MouseEvent): Point {
+    const rect = this.options.el.getBoundingClientRect();
 
-    if (
-      this.options.textEditor.active
-    ) {
-      if (
-        this.handleTextEditingKey(
-          event,
-        )
-      ) {
-        return;
-      }
-    }
+    return {
+      x: event.clientX - rect.left,
 
-    const modifier =
-      event.metaKey ||
-      event.ctrlKey;
+      y: event.clientY - rect.top,
+    };
+  }
 
-    if (
-      modifier &&
-      event.key.toLowerCase() ===
-      "z"
-    ) {
-      event.preventDefault();
-
-      if (event.shiftKey) {
-        this.options.history.redo();
-      } else {
-        this.options.history.undo();
-      }
-
-      return;
-    }
-
-    if (
-      event.key === "Escape"
-    ) {
-      this.handleEscape();
-      return;
-    }
-
-    if (
-      event.key === "Delete" ||
-      event.key === "Backspace"
-    ) {
-      this.handleDelete(event);
-      return;
-    }
-
-    if (
-      modifier &&
-      event.key.toLowerCase() ===
-      "a"
-    ) {
-      this.handleSelectAll(event);
-    }
+  private onGestureStart = (event: Event): void => {
+    event.preventDefault();
+    this.gestureStartScale = this.options.controller.viewportScale;
   };
 
-  private handleEscape(): void {
-    if (
-      this.options.textEditor.active
-    ) {
-      this.options.textEditor.cancel();
-      return;
-    }
-
-    if (
-      this.options.mode() ===
-      "detail"
-    ) {
-      this.options.detail.state.drag =
-        null;
-
-      this.options.selection
-        .clearElements();
-
-      this.options.selection
-        .clearElementArrows();
-
-      this.options.refresh();
-
-      return;
-    }
-
-    this.options.board.state.drag =
-      null;
-
-    this.options.board.clearLinkMode();
-
-    this.options.selection.clearAll();
-
-    this.options.refresh();
-  }
-
-  private handleDelete(
-    event: KeyboardEvent,
-  ): void {
+  private onGestureChange = (event: Event): void => {
     event.preventDefault();
+    const gesture = event as SafariGestureEvent;
+    const rect = this.options.el.getBoundingClientRect();
+    const point: Point = {
+      x: gesture.clientX - rect.left,
 
-    if (
-      this.options.mode() ===
-      "detail"
-    ) {
-      this.options.detail
-        .deleteSelectedElements();
+      y: gesture.clientY - rect.top,
+    };
 
-      return;
-    }
+    this.options.controller.setZoomAt(point, this.gestureStartScale * gesture.scale);
+  };
 
-    // Put your existing board deletion
-    // operation on CanvasBoardController.
-    //
-    // this.options.board.deleteSelection();
-  }
-
-  private handleSelectAll(
-    event: KeyboardEvent,
-  ): void {
+  private onGestureEnd = (event: Event): void => {
     event.preventDefault();
-
-    if (
-      this.options.mode() ===
-      "detail"
-    ) {
-      this.options.detail
-        .selectAllElements();
-
-      return;
-    }
-
-    // Likewise:
-    //
-    // this.options.board.selectAll();
-  }
-
-  private handleTextEditingKey(
-    event: KeyboardEvent,
-  ): boolean {
-    const editor =
-      this.options.textEditor;
-
-    const modifier =
-      event.metaKey ||
-      event.ctrlKey;
-
-    if (
-      modifier &&
-      event.key.toLowerCase() ===
-      "a"
-    ) {
-      event.preventDefault();
-
-      editor.selectAll();
-
-      return true;
-    }
-
-    if (
-      event.key === "Escape"
-    ) {
-      event.preventDefault();
-
-      editor.cancel();
-
-      return true;
-    }
-
-    if (
-      event.key === "Enter"
-    ) {
-      event.preventDefault();
-
-      editor.insert("\n");
-
-      return true;
-    }
-
-    if (
-      event.key === "Backspace"
-    ) {
-      event.preventDefault();
-
-      if (
-        event.altKey
-      ) {
-        editor.deleteWordBackward();
-      } else {
-        editor.deleteBackward();
-      }
-
-      return true;
-    }
-
-    if (
-      event.key === "Delete"
-    ) {
-      event.preventDefault();
-
-      if (
-        event.altKey
-      ) {
-        editor.deleteWordForward();
-      } else {
-        editor.deleteForward();
-      }
-
-      return true;
-    }
-
-    if (
-      event.key ===
-      "ArrowLeft"
-    ) {
-      event.preventDefault();
-
-      editor.moveCursor(
-        event.altKey
-          ? "word-left"
-          : "left",
-        event.shiftKey,
-      );
-
-      return true;
-    }
-
-    if (
-      event.key ===
-      "ArrowRight"
-    ) {
-      event.preventDefault();
-
-      editor.moveCursor(
-        event.altKey
-          ? "word-right"
-          : "right",
-        event.shiftKey,
-      );
-
-      return true;
-    }
-
-    return false;
-  }
+    this.options.controller.endGesture?.();
+    this.gestureStartScale = 1;
+  };
 }

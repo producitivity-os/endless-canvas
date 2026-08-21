@@ -1,143 +1,29 @@
-import type { CanvasEngine } from "../engine";
-import type { CanvasLink, CanvasCard } from "../model";
-import type { CanvasPersistenceAdapter } from "../persistence";
-import type { CanvasAssetAdapter, CanvasPreferences } from "../runtime";
-import type { CanvasBoard, CanvasViewport } from "./canvas";
+import type { BoardDrag, CanvasTool, DetailDrag } from ".";
+import { CanvasSelectionState, type CanvasAssetAdapter } from "../runtime";
+import type { EndlessCanvasState } from "./canvas";
 
-
-export type EndlessCanvasRuntimeOptions = {
-  engine: CanvasEngine;
-  document: CanvasRuntimeDocument;
-  // algorithms: CanvasRuntimeDependencies;
-  // ui: CanvasUiController;
-  persistence: CanvasPersistenceAdapter;
+export type EndlessCanvasOptions = {
+  initialState?: EndlessCanvasState;
+  onChange?: (state: CanvasState) => void;
   assets?: CanvasAssetAdapter;
-
-  preferences: {
-    current: () => CanvasPreferences;
-
-    activateBoard: (
-      boardId: string,
-    ) => CanvasPreferences;
-
-    change: (
-      boardId: string,
-      preferences: CanvasPreferences,
-    ) => void;
-
-    subscribe: (
-      listener: (
-        preferences: CanvasPreferences,
-      ) => void,
-    ) => () => void;
-  };
-
-  onError?: (
-    message: string,
-  ) => void;
-
+  onError?: (error: unknown) => void;
 };
 
-
-
-export type CanvasRuntimeDocument = {
-
-  board: CanvasBoard;
-  cards: CanvasCard[];
-  links: CanvasLink[];
-
-  primaryCard: {
-    id: string;
+export class EndlessCanvasRuntimeState {
+  viewport = {
+    x: 0,
+    y: 0,
+    scale: 1,
   };
-  selectedCardIds: Set<string>;
-  selectedLinkIds: Set<string>;
-  selectedElementIds: Set<string>;
-  selectedElementArrowIds: Set<string>;
 
+  selection = new CanvasSelectionState();
 
-  commit: (
-    origin?: string,
-  ) => void;
+  tool: CanvasTool = "select";
 
-  snapshotCards: () => CanvasCard[];
+  // hoveredLinkId = "";
+  // hoveredElementId = "";
 
-  snapshotLinks: () => CanvasLink[];
-
-  undo: () => void;
-
-  redo: () => void;
-
-  beginUndoGroup: () => void;
-
-  canUndo: () => boolean;
-
-  canRedo: () => boolean;
-
-  setCards: (
-    cards: CanvasCard[],
-  ) => void;
-
-  setLinks: (
-    links: CanvasLink[],
-  ) => void;
-
-  selectCards: (
-    ids: Iterable<string>,
-  ) => void;
-
-  selectLinks: (
-    ids: Iterable<string>,
-  ) => void;
-
-  restoreSelection: (
-    selection: {
-      primaryCardId?: string;
-
-      cardIds?: Iterable<string>;
-
-      linkIds?: Iterable<string>;
-
-      elementIds?: Iterable<string>;
-
-      elementArrowIds?: Iterable<string>;
-    },
-  ) => void;
-
-  configureSync: (
-    context: {
-      boardId: () => string;
-
-      viewport: () =>
-        CanvasViewport;
-
-      onSaved?: (
-        boardId: string,
-      ) => void;
-
-      onError?: (
-        error: unknown,
-      ) => void;
-    },
-  ) => void;
-
-  scheduleSync: (
-    delay?: number,
-    commit?: boolean,
-  ) => void;
-
-  flushSync: () =>
-    Promise<void>;
-
-
-  hydrate(
-    board: CanvasBoard,
-  ): void;
-
-  snapshotBoard(): CanvasBoard;
-
-  setBoard(
-    board: CanvasBoard,
-  ): void;
-};
-
-
+  // boardDrag: BoardDrag | null = null;
+  //
+  // detailDrag: DetailDrag | null = null;
+}

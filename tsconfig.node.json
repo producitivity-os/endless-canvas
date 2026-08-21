@@ -10,7 +10,7 @@
     ],
     "skipLibCheck": true,
     "paths": {
-      "@/*": [
+      "@endless-canvas/*": [
         "./src/*"
       ]
     },

@@ -1,4 +1,4 @@
-import { Shape, type ShapeInit } from "../shape";
+import { Shape, type ShapeInit } from "./shape";
 
 export class RectangleElement extends Shape {
   readonly type = "rect" as const;

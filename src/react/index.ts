@@ -1,2 +1,1 @@
-export { EndlessCanvas } from "./EndlessCanvas";
-export type { EndlessCanvasProps } from "./EndlessCanvas";
+export * from "./EndlessCanvas.tsx";

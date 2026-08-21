@@ -1,4 +1,4 @@
-import { CanvasLink, type CanvasLinkInit } from "../model/arrow";
+import { CanvasLink, ElementArrow, type CanvasLinkInit } from "../model/arrow";
 import type { CanvasCard } from "../model/card";
 import type { CanvasCardInit, CanvasViewport } from "../types/canvas";
 import type { Point } from "../types/geometry";
@@ -11,6 +11,88 @@ export function cloneCards(
   cards: CanvasCard[],
 ): CanvasCard[] {
   return structuredClone(cards);
+}
+
+export function cloneElementArrows(
+  arrows: ElementArrow[],
+): ElementArrow[] {
+  return arrows.map(
+    (arrow) =>
+      new ElementArrow({
+        id: arrow.id,
+
+        fromElementId:
+          arrow.fromElementId,
+
+        toElementId:
+          arrow.toElementId,
+
+        fromAnchor: {
+          ...arrow.fromAnchor,
+        },
+
+        toAnchor: {
+          ...arrow.toAnchor,
+        },
+
+        routing:
+          arrow.routing,
+
+        startHead:
+          arrow.startHead,
+
+        endHead:
+          arrow.endHead,
+
+        bend:
+          arrow.bend,
+
+        strokeWidth:
+          arrow.strokeWidth,
+      }),
+  );
+}
+export function cloneLinks(
+  links: CanvasLink[],
+): CanvasLink[] {
+  return links.map(
+    (link) =>
+      new CanvasLink({
+        id: link.id,
+
+        fromId:
+          link.fromId,
+
+        toId:
+          link.toId,
+
+        fromAnchor: {
+          ...link.fromAnchor,
+        },
+
+        toAnchor: {
+          ...link.toAnchor,
+        },
+
+        routing:
+          link.routing,
+
+        startHead:
+          link.startHead,
+
+        endHead:
+          link.endHead,
+
+        bend:
+          link.bend,
+
+        strokeWidth:
+          link.strokeWidth,
+
+        label:
+          link.label,
+      }),
+  );
 }
 
 export function cardsAsPlainData(cards: CanvasCard[]) { return JSON.parse(JSON.stringify(cards)) as CanvasCardInit[]; }

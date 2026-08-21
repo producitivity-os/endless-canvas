@@ -1,1 +1,1 @@
-export * from "./serialization.ts"
+export * from "./serialization.ts";

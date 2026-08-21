@@ -1,65 +1,93 @@
-import { initializeCanvasRuntime } from "@/core/runtime/initialise";
-import type { EndlessCanvasRuntimeOptions } from "@/core/types/runtime";
+import { useEffect, useRef } from "react";
+
 import {
-  useEffect,
-  useRef,
-} from "react";
-
-// import {
-//   initializeCanvasRuntime,
-// } from "@/core/runtime";
-
-// import type {
-//   EndlessCanvasRuntimeOptions,
-// } from "@/core/types";
+  CanvasEngine,
+  CanvasController,
+  type EndlessCanvasState,
+  CanvasInteractionController,
+  CanvasSelectionController,
+  CanvasSelectionState,
+  type EndlessCanvasOptions,
+  EndlessCanvasRuntimeState,
+} from "../core";
+import type { CanvasTool } from "../../playground/components/Toolbar";
 
 export interface EndlessCanvasProps {
-  options: EndlessCanvasRuntimeOptions;
+  initialState?: EndlessCanvasState;
+
+  onChange?: (state: EndlessCanvasState) => void;
+  onError?: (error: unknown) => void;
+  mode: CanvasTool;
 
   className?: string;
 
   style?: React.CSSProperties;
+  options: EndlessCanvasOptions;
 }
 
-export function EndlessCanvas({
-  options,
-  className,
-  style,
-}: EndlessCanvasProps) {
-  const hostRef =
-    useRef<HTMLDivElement>(null);
+export function EndlessCanvas({ initialState, onChange, className, style }: EndlessCanvasProps) {
+  const selectionState = new CanvasSelectionState();
+  const hostRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const host =
-      hostRef.current;
+    const el = hostRef.current;
 
-    if (!host) {
+    if (!el) {
       return;
     }
 
-    let destroyed = false;
+    const state: EndlessCanvasState = {
+      cards: initialState?.cards ?? [],
+      links: initialState?.links ?? [],
+    };
 
-    let cleanup:
-      | (() => void)
-      | undefined;
+    const runtime = new EndlessCanvasRuntimeState();
 
-    void initializeCanvasRuntime(
-      host,
-      options,
-    ).then((runtimeCleanup) => {
-      if (destroyed) {
-        runtimeCleanup();
+    const engine = new CanvasEngine();
+
+    let controller: CanvasController | undefined;
+
+    let interactions: CanvasInteractionController | undefined;
+
+    let disposed = false;
+
+    void engine.initialize(el).then(() => {
+      if (disposed) {
+        engine.destroy();
         return;
       }
 
-      cleanup = runtimeCleanup;
+      const selection = new CanvasSelectionController(runtime.selection);
+
+      controller = new CanvasController({
+        runtime,
+        selection,
+        engine,
+        state,
+
+        onChange: () => {
+          onChange?.(state);
+        },
+      });
+
+      interactions = new CanvasInteractionController({
+        el,
+        controller,
+      });
+
+      interactions.attach();
+
+      controller.render();
+      engine.show();
     });
 
     return () => {
-      destroyed = true;
-      cleanup?.();
+      disposed = true;
+
+      interactions?.detach();
+      engine.destroy();
     };
-  }, [options]);
+  }, []);
 
   return (
     <div
@@ -67,8 +95,8 @@ export function EndlessCanvas({
       className={className}
       style={{
         position: "relative",
-        width: "100%",
-        height: "100%",
+        width: "100vw",
+        height: "100vh",
         overflow: "hidden",
         ...style,
       }}

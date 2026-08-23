@@ -1,0 +1,102 @@
+.canvas-toolbar {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 6px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(148, 163, 184, 0.38);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow:
+    0 12px 34px rgba(15, 23, 42, 0.16),
+    0 2px 7px rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(14px);
+}
+
+.canvas-toolbar__item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.canvas-toolbar__separator {
+  width: 1px;
+  height: 24px;
+  margin: 0 4px;
+  background: #e2e8f0;
+}
+
+.canvas-toolbar__button {
+  position: relative;
+  display: grid;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  color: #475569;
+  background: transparent;
+  cursor: pointer;
+  transition:
+    color 120ms ease,
+    background 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.canvas-toolbar__button:hover {
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+
+.canvas-toolbar__button[aria-pressed="true"] {
+  color: #ffffff;
+  background: #2563eb;
+  box-shadow: 0 3px 9px rgba(37, 99, 235, 0.32);
+}
+
+.canvas-toolbar__button:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+.canvas-toolbar__button::after {
+  position: absolute;
+  top: calc(100% + 11px);
+  left: 50%;
+  z-index: 2;
+  padding: 4px 7px;
+  transform: translate(-50%, -3px);
+  border-radius: 5px;
+  color: white;
+  background: #0f172a;
+  content: attr(data-tooltip);
+  font:
+    500 11px/1.2 Inter,
+    system-ui,
+    sans-serif;
+  opacity: 0;
+  pointer-events: none;
+  white-space: nowrap;
+  transition:
+    opacity 100ms ease,
+    transform 100ms ease;
+}
+
+.canvas-toolbar__button:hover::after,
+.canvas-toolbar__button:focus-visible::after {
+  transform: translate(-50%, 0);
+  opacity: 1;
+}
+
+@media (max-width: 760px) {
+  .canvas-toolbar {
+    max-width: calc(100vw - 24px);
+    overflow-x: auto;
+  }
+}

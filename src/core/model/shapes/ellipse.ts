@@ -1,6 +1,21 @@
-import { Shape, type ShapeInit } from "./shape";
+import { BaseShapeObject, type BaseShapeObjectInit } from "./shape.ts";
 
-export class EllipseElement extends Shape {
+export type EllipseObjectInit = BaseShapeObjectInit & { arcSweep?: number };
+
+export class EllipseObject extends BaseShapeObject {
   readonly type = "ellipse" as const;
-  constructor(init: ShapeInit) { super(init); }
+  arcSweep: number;
+  constructor(init: EllipseObjectInit) {
+    super(init);
+    this.arcSweep = Math.max(0.01, Math.min(1, init.arcSweep ?? 1));
+  }
 }
+
+// export interface EllipseElement extends CanvasObject {
+//   type: "ellipse";
+//   fill: number;
+//   stroke: number;
+//   strokeWidth?: number;
+//   fillStyle?: "solid" | "hachure" | "cross-hatch" | "none";
+// }
+//

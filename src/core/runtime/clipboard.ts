@@ -1,11 +1,10 @@
-import type { CanvasCard } from "../model/card";
-import { createTextElement, type TextElementInit } from "../model/text";
-import type { CanvasElement } from "../types/elements";
+import type { CanvasObject } from "../model";
+import type { CanvasCardObject } from "../model/card";
 
 export class CanvasClipboard {
-  private card: CanvasCard | null = null;
+  private card: CanvasCardObject | null = null;
 
-  private elements: CanvasElement[] = [];
+  private elements: CanvasObject[] = [];
 
   get hasCard(): boolean {
     return this.card !== null;
@@ -28,15 +27,15 @@ export class CanvasClipboard {
     this.elements = [];
   }
 
-  copyCard(card: CanvasCard): void {
+  copyCard(card: CanvasCardObject): void {
     this.card = this.cloneCard(card);
   }
 
-  copyElements(elements: Iterable<CanvasElement>): void {
+  copyElements(elements: Iterable<CanvasObject>): void {
     this.elements = Array.from(elements, (element) => this.cloneElement(element));
   }
 
-  pasteCard(): CanvasCard | null {
+  pasteCard(): CanvasCardObject | null {
     if (!this.card) {
       return null;
     }
@@ -53,7 +52,7 @@ export class CanvasClipboard {
       x: 24,
       y: 24,
     },
-  ): CanvasElement[] {
+  ): CanvasObject[] {
     if (!this.hasElements) {
       return [];
     }
@@ -62,13 +61,7 @@ export class CanvasClipboard {
       const clone = this.cloneElement(element);
 
       clone.id = crypto.randomUUID();
-
-      //FIX: Uncomment this
-      // translateElement(
-      //   clone,
-      //   offset.x,
-      //   offset.y,
-      // );
+      clone.translate(offset.x, offset.y);
 
       return clone;
     });
@@ -78,16 +71,17 @@ export class CanvasClipboard {
     return pasted;
   }
 
-  private cloneCard(card: CanvasCard): CanvasCard {
+  private cloneCard(card: CanvasCardObject): CanvasCardObject {
     return structuredClone(card);
   }
 
-  private cloneElement(element: CanvasElement): CanvasElement {
+  private cloneElement(element: CanvasObject): CanvasObject {
     const clone = structuredClone(element);
 
-    if (clone.type === "text") {
-      return createTextElement(clone as TextElementInit);
-    }
+    //FIX: uncomment this
+    // if (clone.type === "text") {
+    //   return createTextElement(clone as TextElementInit);
+    // }
 
     return clone;
   }

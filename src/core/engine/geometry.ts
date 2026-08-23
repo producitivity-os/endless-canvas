@@ -1,12 +1,10 @@
-import type { ResizeCorner, Point } from "../types";
+import type { ResizeCorner, CanvasPoint } from "../types";
 import type { Bounds } from "./spatial";
-
-
 
 export function resizeBoundsFromCorner(
   corner: ResizeCorner,
   origin: Bounds,
-  point: Point,
+  point: CanvasPoint,
   minWidth: number,
   minHeight: number,
   preserveAspectRatio = false,
@@ -43,16 +41,12 @@ export function resizeBoundsFromCorner(
       break;
   }
 
-  let width =
-    Math.abs(nextRight - nextLeft);
+  let width = Math.abs(nextRight - nextLeft);
 
-  let height =
-    Math.abs(nextBottom - nextTop);
+  let height = Math.abs(nextBottom - nextTop);
 
   if (preserveAspectRatio) {
-    const aspect =
-      origin.width /
-      Math.max(origin.height, 0.001);
+    const aspect = origin.width / Math.max(origin.height, 0.001);
 
     if (width / Math.max(height, 0.001) > aspect) {
       height = width / aspect;
@@ -61,31 +55,17 @@ export function resizeBoundsFromCorner(
     }
   }
 
-  width = Math.max(
-    minWidth,
-    width,
-  );
+  width = Math.max(minWidth, width);
 
-  height = Math.max(
-    minHeight,
-    height,
-  );
+  height = Math.max(minHeight, height);
 
-  const draggingLeft =
-    corner === "topLeft" ||
-    corner === "bottomLeft";
+  const draggingLeft = corner === "topLeft" || corner === "bottomLeft";
 
-  const draggingTop =
-    corner === "topLeft" ||
-    corner === "topRight";
+  const draggingTop = corner === "topLeft" || corner === "topRight";
 
-  const x = draggingLeft
-    ? right - width
-    : left;
+  const x = draggingLeft ? right - width : left;
 
-  const y = draggingTop
-    ? bottom - height
-    : top;
+  const y = draggingTop ? bottom - height : top;
 
   return {
     x,

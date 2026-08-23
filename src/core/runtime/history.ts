@@ -16,10 +16,8 @@ export class CanvasHistoryController<TSnapshot> {
   private readonly maxEntries: number;
 
   private readonly options: CanvasHistoryOptions<TSnapshot>;
-  constructor(
-    options: CanvasHistoryOptions<TSnapshot>
-  ) {
-    this.options = options
+  constructor(options: CanvasHistoryOptions<TSnapshot>) {
+    this.options = options;
     this.maxEntries = options.maxEntries ?? 100;
   }
 
@@ -40,8 +38,7 @@ export class CanvasHistoryController<TSnapshot> {
       return;
     }
 
-    this.pendingSnapshot =
-      this.options.capture();
+    this.pendingSnapshot = this.options.capture();
   }
 
   commit(): void {
@@ -49,9 +46,7 @@ export class CanvasHistoryController<TSnapshot> {
       return;
     }
 
-    this.undoStack.push(
-      this.pendingSnapshot,
-    );
+    this.undoStack.push(this.pendingSnapshot);
 
     this.pendingSnapshot = null;
 
@@ -67,9 +62,7 @@ export class CanvasHistoryController<TSnapshot> {
       return;
     }
 
-    this.options.restore(
-      this.pendingSnapshot,
-    );
+    this.options.restore(this.pendingSnapshot);
 
     this.pendingSnapshot = null;
 
@@ -87,11 +80,9 @@ export class CanvasHistoryController<TSnapshot> {
 
     this.pendingSnapshot = null;
 
-    const current =
-      this.options.capture();
+    const current = this.options.capture();
 
-    const previous =
-      this.undoStack.pop();
+    const previous = this.undoStack.pop();
 
     if (!previous) {
       return false;
@@ -113,11 +104,9 @@ export class CanvasHistoryController<TSnapshot> {
 
     this.pendingSnapshot = null;
 
-    const current =
-      this.options.capture();
+    const current = this.options.capture();
 
-    const next =
-      this.redoStack.pop();
+    const next = this.redoStack.pop();
 
     if (!next) {
       return false;
@@ -142,10 +131,7 @@ export class CanvasHistoryController<TSnapshot> {
   }
 
   private trimUndoStack(): void {
-    while (
-      this.undoStack.length >
-      this.maxEntries
-    ) {
+    while (this.undoStack.length > this.maxEntries) {
       this.undoStack.shift();
     }
   }

@@ -1,50 +1,93 @@
-import { Application, Container, Graphics, Rectangle, Sprite, Text } from "pixi.js";
-
-import type { EditState, ResizeCorner } from "../types/events";
-
-import type { Point } from "../types/geometry";
-
-import type { CanvasElement } from "../types/elements";
-
+import { Application, Container, Graphics } from "pixi.js";
 import type { CanvasGridStyle, CanvasTheme } from "../model/canvas";
+import { CardRenderer } from "./renderers/card-renderer";
+import { ImageRenderer } from "./renderers/image-render";
+import { ShapeRenderer } from "./renderers/shape-renderer";
+import { TextRenderer } from "./renderers/text-renderer";
+import { PathRenderer } from "./renderers/path-renderer";
+import { ArrowRenderer } from "./renderers/arrow-renderer";
+import type { EndlessCanvasRuntimeState, EndlessCanvasState } from "../types";
+import type {
+  ArrowObject,
+  CanvasCardObject,
+  CanvasObject,
+  CanvasObjectType,
+  TextObject,
+} from "../model";
+import type { CanvasRenderContext, ElementRenderer } from "./renderers/renderer";
+import { OverlayRenderer } from "./renderers/overlay-renderer";
+import { RetainedViewLayer } from "./renderers/retained-view-layer";
+import { markdownTextRenderer } from "../markdown";
+import { CardPreviewCache } from "./renderers/card-preview-cache";
 
-import { drawTextElement } from "../model/text";
+export class ElementRendererRegistry {
+  private readonly renderers = new Map<CanvasObjectType, ElementRenderer<CanvasObject>>();
+  private readonly keys = new WeakMap<Container, string>();
 
-import {
-  drawBrokenImageIcon,
-  imageIsLoading,
-  imageLoadFailed,
-  imageTextureFor,
-} from "../model/image";
+  register<T extends CanvasObject>(type: CanvasObjectType, renderer: ElementRenderer<T>): void {
+    this.renderers.set(type, renderer as ElementRenderer<CanvasObject>);
+  }
+  render(target: Container, element: CanvasObject, context: CanvasRenderContext): void {
+    const renderer = this.renderers.get(element.type);
 
-import { hasLatexCompileError, latexRenderedSize, latexTextureFor } from "../latex/latex";
+    if (!renderer) {
+      throw new Error(`No renderer registered for element type "${element.type}"`);
+    }
+    renderer.render(target, element, context);
+  }
 
-import { detailSelectionColor, elementBounds, elementCenter, resizeHandleCenters } from "./utils";
-import type { CanvasCard } from "../model";
+  reconcile(target: Container, element: CanvasObject, context: CanvasRenderContext): void {
+    const renderer = this.rendererFor(element);
+    if (renderer.reconcile) {
+      renderer.reconcile(target, element, context);
+      return;
+    }
+    const key = renderer.invalidationKey?.(element, context) ?? JSON.stringify([element, context]);
+    if (this.keys.get(target) === key) return;
+    this.clear(target);
+    renderer.render(target, element, context);
+    this.keys.set(target, key);
+  }
+
+  dispose(target: Container, element: CanvasObject): void {
+    this.rendererFor(element).dispose?.(target, element.id);
+    this.keys.delete(target);
+  }
+
+  private rendererFor(element: CanvasObject): ElementRenderer<CanvasObject> {
+    const renderer = this.renderers.get(element.type);
+    if (!renderer) {
+      throw new Error(`No renderer registered for element type "${element.type}"`);
+    }
+    return renderer;
+  }
+
+  private clear(container: Container): void {
+    for (const child of container.removeChildren()) child.destroy({ children: true });
+  }
+}
 
 export class CanvasEngine {
   readonly app = new Application();
 
   readonly gridLayer = new Graphics();
-
   readonly viewport = new Container();
-
-  readonly linkLayer = new Graphics();
-
-  readonly cardLayer = new Container();
-
+  readonly underArrowLayer = new Container();
+  readonly objectLayer = new Container();
+  readonly overArrowLayer = new Container();
   readonly previewLayer = new Graphics();
-
-  readonly detailLayer = new Container();
-
   readonly overlayLayer = new Container();
-
+  private readonly renderers = new ElementRendererRegistry();
+  private readonly arrowRenderer = new ArrowRenderer();
+  private readonly overlayRenderer = new OverlayRenderer();
+  private readonly objectViews = new RetainedViewLayer<CanvasObject>((container, object) =>
+    this.renderers.dispose(container, object),
+  );
+  private readonly underArrowViews = new RetainedViewLayer<ArrowObject>();
+  private readonly overArrowViews = new RetainedViewLayer<ArrowObject>();
+  private cardPreviews: CardPreviewCache | null = null;
   detailViewport: Container | null = null;
-
   detailGrid: Graphics | null = null;
-
-  private host: HTMLElement | null = null;
-
   private initialized = false;
 
   get canvas(): HTMLCanvasElement {
@@ -56,8 +99,6 @@ export class CanvasEngine {
       return;
     }
 
-    this.host = host;
-
     await this.app.init({
       antialias: true,
       autoDensity: true,
@@ -68,33 +109,54 @@ export class CanvasEngine {
       resolution: Math.min(2, window.devicePixelRatio || 1),
     });
 
+    this.cardPreviews = new CardPreviewCache({
+      generateTexture: (target, frame) =>
+        this.app.renderer.generateTexture({
+          target,
+          frame,
+          resolution: 1,
+          clearColor: [0, 0, 0, 0],
+          antialias: true,
+        }),
+      renderElement: (target, element, context) => this.renderers.render(target, element, context),
+      renderArrow: (target, arrow, objects, context) =>
+        this.arrowRenderer.render(target, arrow, objects, context),
+    });
+    this.renderers.register("card", new CardRenderer(this.cardPreviews));
+    const shapeRenderer = new ShapeRenderer();
+    this.renderers.register("rect", shapeRenderer);
+    this.renderers.register("ellipse", shapeRenderer);
+    this.renderers.register("diamond", shapeRenderer);
+    this.renderers.register("pentagon", shapeRenderer);
+    this.renderers.register("parallelogram", shapeRenderer);
+    this.renderers.register("image", new ImageRenderer());
+    this.renderers.register("text", new TextRenderer());
+    this.renderers.register("path", new PathRenderer());
+
     this.canvas.className = "pixi-canvas";
-
     this.canvas.tabIndex = 0;
-
     this.canvas.style.visibility = "hidden";
-
     this.app.stage.eventMode = "static";
-
     this.app.stage.hitArea = this.app.screen;
-
     this.viewport.sortableChildren = true;
-
-    this.linkLayer.zIndex = 20;
-    this.cardLayer.zIndex = 25;
+    this.underArrowLayer.zIndex = 20;
+    this.objectLayer.zIndex = 25;
+    this.overArrowLayer.zIndex = 27;
     this.previewLayer.zIndex = 30;
+    this.overlayLayer.zIndex = 40;
 
-    this.viewport.addChild(this.linkLayer, this.cardLayer, this.previewLayer);
-
-    this.app.stage.addChild(this.gridLayer, this.viewport, this.detailLayer, this.overlayLayer);
+    this.app.stage.addChild(this.gridLayer, this.viewport);
+    this.viewport.addChild(
+      this.underArrowLayer,
+      this.objectLayer,
+      this.overArrowLayer,
+      this.previewLayer,
+      this.overlayLayer,
+    );
 
     host.prepend(this.canvas);
 
     this.initialized = true;
-  }
-
-  show(): void {
-    this.canvas.style.visibility = "visible";
   }
 
   focus(): void {
@@ -114,16 +176,11 @@ export class CanvasEngine {
   }
 
   clearBoard(): void {
-    this.linkLayer.clear();
-    this.cardLayer.removeChildren();
+    this.underArrowViews.clear();
+    this.objectViews.clear();
+    this.overArrowViews.clear();
     this.previewLayer.clear();
-  }
-
-  clearDetail(): void {
-    this.detailLayer.removeChildren();
-
-    this.detailViewport = null;
-    this.detailGrid = null;
+    this.clearContainer(this.overlayLayer);
   }
 
   destroy(): void {
@@ -131,177 +188,85 @@ export class CanvasEngine {
       return;
     }
 
+    this.clearBoard();
+    this.cardPreviews?.destroy();
+    this.cardPreviews = null;
+    markdownTextRenderer.destroy();
     this.app.destroy(true, {
       children: true,
     });
 
-    this.host = null;
     this.initialized = false;
   }
 
-  drawElement(target: Container, element: CanvasElement, editing?: EditState | null): void {
-    const rotation = element.rotation ?? 0;
-
-    if (element.type === "text") {
-      drawTextElement(target, element, editing, {
-        textureFor: latexTextureFor,
-
-        renderedSize: latexRenderedSize,
-
-        hasCompileError: hasLatexCompileError,
-      });
-
-      return;
-    }
-
-    if (element.type === "rect" || element.type === "ellipse") {
-      this.drawShape(target, element, rotation);
-
-      return;
-    }
-
-    if (element.type === "image") {
-      this.drawImage(target, element, rotation);
-
-      return;
-    }
-
-    if (element.type === "path" && element.points.length > 1) {
-      const path = new Graphics();
-
-      path.setStrokeStyle({
-        color: element.color,
-        width: element.width,
-        cap: "round",
-        join: "round",
-      });
-
-      path.moveTo(element.points[0].x, element.points[0].y);
-
-      for (const point of element.points.slice(1)) {
-        path.lineTo(point.x, point.y);
-      }
-
-      path.stroke();
-
-      target.addChild(path);
-    }
-  }
-
-  drawSelectionFrame(
-    target: Container,
-    element: CanvasElement,
-    options: {
-      handles: boolean;
-      scale: number;
-      labels?: boolean;
-    },
+  render(
+    state: EndlessCanvasState,
+    runtime: EndlessCanvasRuntimeState,
+    documentObjects: readonly CanvasObject[] = state.objects,
   ): void {
-    const bounds = elementBounds(element);
+    this.cardPreviews?.prune([...documentObjects, ...state.objects]);
+    this.drawGrid(this.app.screen.width, this.app.screen.height);
 
-    const center = elementCenter(element);
+    this.renderArrows(this.underArrowLayer, state, runtime, "under");
 
-    const rotation = element.rotation ?? 0;
-
-    const chromeScale = 1 / Math.max(0.001, options.scale);
-
-    const isText = element.type === "text";
-
-    const isImage = element.type === "image";
-
-    const isShape = element.type === "rect" || element.type === "ellipse";
-
-    const appearance = isText
-      ? element.selectionAppearance()
-      : isImage || isShape
-        ? {
-            color: detailSelectionColor,
-
-            frameWidth: 1.75,
-            handleSize: 9,
-            handleWidth: 1.75,
-          }
-        : null;
-
-    const selectionColor = appearance?.color ?? detailSelectionColor;
-
-    const frame = new Graphics();
-
-    frame.position.set(center.x, center.y);
-
-    frame.rotation = rotation;
-
-    frame.rect(-bounds.width / 2, -bounds.height / 2, bounds.width, bounds.height).stroke({
-      color: selectionColor,
-
-      width: (appearance?.frameWidth ?? 2.75) * chromeScale,
-    });
-
-    target.addChild(frame);
-
-    if (options.labels !== false && isImage) {
-      this.drawImageSizeLabel(target, element, bounds, center, rotation, chromeScale);
-    }
-
-    if (!options.handles || element.type === "path") {
-      return;
-    }
-
-    for (const [corner, point] of Object.entries(resizeHandleCenters(element)) as Array<
-      [ResizeCorner, Point]
-    >) {
-      const handleWidth = (appearance?.handleSize ?? 14) * chromeScale;
-
-      const resize = new Graphics()
-        .roundRect(-handleWidth / 2, -handleWidth / 2, handleWidth, handleWidth, 2.5 * chromeScale)
-        .fill({
-          color: 0xffffff,
-        })
-        .stroke({
-          color: selectionColor,
-
-          width: (appearance?.handleWidth ?? 4) * chromeScale,
+    const objects = state.objects.filter((object) => object.type !== "arrow");
+    this.objectViews.reconcile(
+      this.objectLayer,
+      objects,
+      (object) => object.id,
+      (target, object) => {
+        this.renderers.reconcile(target, object, {
+          scale: this.viewport.scale.x,
+          hovered: runtime.hoveredObjectId === object.id,
+          selected: runtime.selection.isSelected(object.id),
+          editing: runtime.editingTextId === object.id,
+          imageCrop: runtime.imageCrop?.imageId === object.id ? runtime.imageCrop : undefined,
         });
-
-      resize.position.set(point.x, point.y);
-
-      resize.rotation = rotation;
-
-      resize.name = `resize:${element.id}:${corner}`;
-
-      resize.eventMode = "static";
-
-      resize.cursor =
-        corner === "topLeft" || corner === "bottomRight" ? "nwse-resize" : "nesw-resize";
-
-      target.addChild(resize);
-    }
-
-    const compactChrome = isText || isImage || isShape;
-
-    const rotate = new Graphics()
-      .circle(0, 0, (compactChrome ? 5 : 7) * chromeScale)
-      .fill({
-        color: 0xffffff,
-      })
-      .stroke({
-        color: selectionColor,
-
-        width: (appearance?.handleWidth ?? 4) * chromeScale,
-      });
-
-    rotate.position.set(
-      center.x,
-      center.y - bounds.height / 2 - (compactChrome ? 18 : 28) * chromeScale,
+      },
     );
 
-    rotate.name = `rotate:${element.id}`;
+    markdownTextRenderer.prune(this.collectMarkdownIds([...documentObjects, ...state.objects]));
 
-    rotate.eventMode = "static";
+    this.renderArrows(this.overArrowLayer, state, runtime, "over");
 
-    rotate.cursor = "grab";
+    this.previewLayer.clear();
+    this.clearContainer(this.overlayLayer);
+    this.overlayRenderer.render(this.overlayLayer, state, runtime, this.viewport.scale.x);
+  }
 
-    target.addChild(rotate);
+  invalidateCardPreview(cardId: string): void {
+    this.cardPreviews?.invalidate(cardId);
+  }
+
+  get cardPreviewGenerationCount(): number {
+    return this.cardPreviews?.generationCount() ?? 0;
+  }
+
+  private renderArrows(
+    target: Container,
+    state: EndlessCanvasState,
+    runtime: EndlessCanvasRuntimeState,
+    layer: "under" | "over",
+  ): void {
+    const arrows = state.objects.filter((object): object is ArrowObject => {
+      if (object.type !== "arrow") return false;
+      const arrow = object as ArrowObject;
+      return (arrow.renderMode === "under" ? "under" : "over") === layer;
+    });
+    const views = layer === "under" ? this.underArrowViews : this.overArrowViews;
+    views.reconcile(
+      target,
+      arrows,
+      (arrow) => arrow.id,
+      (view, arrow) => {
+        this.clearContainer(view);
+        this.arrowRenderer.render(view, arrow, state.objects, {
+          scale: this.viewport.scale.x,
+          hovered: runtime.hoveredObjectId === arrow.id,
+          selected: runtime.selection.isSelected(arrow.id),
+        });
+      },
+    );
   }
 
   drawGrid(
@@ -314,21 +279,15 @@ export class CanvasEngine {
     opacity = 0.72,
   ): void {
     const grid = this.gridLayer;
-
     const viewport = this.viewport;
-
     const step = baseStep * viewport.scale.x;
-
     const offsetX = ((viewport.x % step) + step) % step;
-
     const offsetY = ((viewport.y % step) + step) % step;
 
     grid.clear();
-
     grid.rect(0, 0, width, height).fill({
       color: background,
     });
-
     if (style === "none") {
       return;
     }
@@ -344,7 +303,6 @@ export class CanvasEngine {
           });
         }
       }
-
       return;
     }
 
@@ -364,249 +322,27 @@ export class CanvasEngine {
 
     grid.stroke();
   }
-
-  private drawShape(
-    target: Container,
-    element: Extract<
-      CanvasElement,
-      {
-        type: "rect" | "ellipse";
-      }
-    >,
-    rotation: number,
-  ): void {
-    const root = new Container();
-
-    const radius =
-      element.type === "rect"
-        ? Math.min(element.cornerRadius ?? 6, element.width / 2, element.height / 2)
-        : 0;
-
-    const shape =
-      element.type === "rect"
-        ? new Graphics().roundRect(0, 0, element.width, element.height, radius)
-        : new Graphics().ellipse(
-            element.width / 2,
-            element.height / 2,
-            element.width / 2,
-            element.height / 2,
-          );
-
-    if ((element.fillStyle ?? "solid") !== "none") {
-      shape.fill({
-        color: element.fill,
-
-        alpha: element.fillStyle === "solid" || !element.fillStyle ? 1 : 0.12,
-      });
-    }
-
-    shape.stroke({
-      color: element.stroke,
-
-      width: element.strokeWidth ?? 2,
-    });
-
-    root.addChild(shape);
-
-    root.position.set(
-      element.x + element.width / 2,
-
-      element.y + element.height / 2,
-    );
-
-    root.pivot.set(element.width / 2, element.height / 2);
-
-    root.rotation = rotation;
-
-    root.alpha = element.opacity ?? 1;
-
-    target.addChild(root);
+  show(): void {
+    this.canvas.style.visibility = "visible";
   }
 
-  private drawImage(
-    target: Container,
-    element: Extract<CanvasElement, { type: "image" }>,
-    rotation: number,
-  ): void {
-    const source = element.previewSrc || element.src;
+  private clearContainer(container: Container): void {
+    for (const child of container.removeChildren()) {
+      child.destroy({ children: true });
+    }
+  }
 
-    const texture = imageTextureFor(source);
-
-    const loading = element.uploadStatus === "uploading" || imageIsLoading(source);
-
-    const root = new Container();
-
-    const radius = Math.max(
-      0,
-      Math.min(element.cornerRadius ?? 0, element.width / 2, element.height / 2),
-    );
-
-    root.position.set(
-      element.x + element.width / 2,
-
-      element.y + element.height / 2,
-    );
-
-    root.pivot.set(element.width / 2, element.height / 2);
-
-    root.rotation = rotation;
-
-    if (texture) {
-      const sprite = new Sprite(texture);
-
-      const crop = element.crop ?? {
-        x: 0,
-        y: 0,
-        width: 1,
-        height: 1,
-      };
-
-      sprite.width = element.width / Math.max(0.001, crop.width);
-
-      sprite.height = element.height / Math.max(0.001, crop.height);
-
-      sprite.position.set(
-        -crop.x * sprite.width,
-
-        -crop.y * sprite.height,
-      );
-
-      sprite.alpha = element.uploadStatus === "uploading" ? 0.38 : 1;
-
-      const mask = new Graphics().roundRect(0, 0, element.width, element.height, radius).fill({
-        color: 0xffffff,
-      });
-
-      sprite.mask = mask;
-
-      root.addChild(mask, sprite);
-    } else {
-      const failed = imageLoadFailed(source);
-
-      root.addChild(
-        new Graphics()
-          .roundRect(0, 0, element.width, element.height, radius)
-          .fill({
-            color: failed ? 0xf1f2f4 : 0xe5e7eb,
-          })
-          .stroke({
-            color: 0xd1d5db,
-
-            width: 1,
-          }),
-      );
-
-      if (failed) {
-        root.addChild(drawBrokenImageIcon(element.width, element.height));
+  private collectMarkdownIds(
+    objects: readonly CanvasObject[],
+    result = new Set<string>(),
+  ): Set<string> {
+    for (const object of objects) {
+      if (object.type === "text" && (object as TextObject).format === "markdown") {
+        result.add(object.id);
+      } else if (object.type === "card") {
+        this.collectMarkdownIds((object as CanvasCardObject).elements, result);
       }
     }
-
-    if (loading) {
-      const width = Math.max(44, Math.min(140, element.width - 24));
-
-      const x = (element.width - width) / 2;
-
-      const y = element.height / 2 - 5;
-
-      root.addChild(
-        new Graphics()
-          .roundRect(x, y, width, 10, 999)
-          .fill({
-            color: detailSelectionColor,
-
-            alpha: 0.16,
-          })
-          .roundRect(x, y, width * 0.58, 10, 999)
-          .fill({
-            color: detailSelectionColor,
-
-            alpha: 0.82,
-          }),
-      );
-    }
-
-    root.alpha = element.opacity ?? 1;
-
-    target.addChild(root);
-  }
-
-  private drawImageSizeLabel(
-    target: Container,
-    element: Extract<CanvasElement, { type: "image" }>,
-    bounds: Rectangle,
-    center: Point,
-    rotation: number,
-    chromeScale: number,
-  ): void {
-    const label = new Container();
-
-    const text = new Text({
-      text: `${Math.round(element.width)} × ${Math.round(element.height)} px`,
-
-      style: {
-        fill: 0xffffff,
-
-        fontFamily: "Inter Variable, Inter, system-ui, sans-serif",
-
-        fontSize: 11,
-
-        fontWeight: "600",
-      },
-    });
-
-    label.scale.set(chromeScale);
-
-    text.anchor.set(0.5);
-
-    const width = text.width + 14;
-
-    const y = bounds.height / (2 * chromeScale) + 18;
-
-    label.addChild(
-      new Graphics().roundRect(-width / 2, y - 11, width, 22, 5).fill({
-        color: 0x18181b,
-
-        alpha: 0.92,
-      }),
-    );
-
-    text.position.set(0, y);
-
-    label.addChild(text);
-
-    label.position.set(center.x, center.y);
-
-    label.rotation = rotation;
-
-    target.addChild(label);
-  }
-
-  createCardContainer(card: CanvasCard): Container {
-    const root = new Container();
-
-    root.position.set(card.x, card.y);
-
-    const background = new Graphics()
-      .roundRect(0, 0, card.width, card.height, 12)
-      .fill({
-        color: card.backgroundColor ?? 0xffffff,
-      })
-      .stroke({
-        color: 0xd4d4d8,
-        width: 1,
-      });
-
-    root.addChild(background);
-
-    return root;
-  }
-
-  drawCardSelection(target: Container, card: CanvasCard): void {
-    const selection = new Graphics().roundRect(-2, -2, card.width + 4, card.height + 4, 14).stroke({
-      color: 0x3b82f6,
-      width: 2,
-    });
-
-    target.addChild(selection);
+    return result;
   }
 }

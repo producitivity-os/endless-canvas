@@ -1,5 +1,6 @@
 import type { CanvasController } from "../runtime";
-import type { Point } from "../types";
+import type { CanvasPoint } from "../types";
+import { KeyboardShortcutMapper } from "./keyboard-shortcut-mapper";
 
 interface SafariGestureEvent extends Event {
   scale: number;
@@ -11,13 +12,16 @@ interface SafariGestureEvent extends Event {
 export interface CanvasInteractionControllerOptions {
   el: HTMLDivElement;
   controller: CanvasController;
+  shortcutMapper?: KeyboardShortcutMapper;
 }
 export class CanvasInteractionController {
   private readonly options: CanvasInteractionControllerOptions;
+  private readonly shortcutMapper: KeyboardShortcutMapper;
   private gestureStartScale = 1;
 
   constructor(options: CanvasInteractionControllerOptions) {
     this.options = options;
+    this.shortcutMapper = options.shortcutMapper ?? new KeyboardShortcutMapper();
   }
 
   attach(): void {
@@ -26,6 +30,9 @@ export class CanvasInteractionController {
     canvas.addEventListener("pointerdown", this.onPointerDown);
     canvas.addEventListener("pointermove", this.onPointerMove);
     canvas.addEventListener("pointerup", this.onPointerUp);
+    canvas.addEventListener("pointercancel", this.onPointerUp);
+    canvas.addEventListener("dblclick", this.onDoubleClick);
+    canvas.addEventListener("keydown", this.onKeyDown);
     canvas.addEventListener("wheel", this.onWheel, {
       passive: false,
     });
@@ -46,6 +53,9 @@ export class CanvasInteractionController {
     canvas.removeEventListener("pointerdown", this.onPointerDown);
     canvas.removeEventListener("pointermove", this.onPointerMove);
     canvas.removeEventListener("pointerup", this.onPointerUp);
+    canvas.removeEventListener("pointercancel", this.onPointerUp);
+    canvas.removeEventListener("dblclick", this.onDoubleClick);
+    canvas.removeEventListener("keydown", this.onKeyDown);
     canvas.removeEventListener("wheel", this.onWheel);
     canvas.removeEventListener("gesturestart", this.onGestureStart as EventListener);
     canvas.removeEventListener("gesturechange", this.onGestureChange as EventListener);
@@ -53,15 +63,47 @@ export class CanvasInteractionController {
   }
 
   private onPointerDown = (event: PointerEvent): void => {
+    if (this.isEditableTarget(event.target)) {
+      return;
+    }
+    this.options.controller.focus();
+    this.options.el.setPointerCapture?.(event.pointerId);
     this.options.controller.pointerDown(this.screenPoint(event), event);
   };
 
   private onPointerMove = (event: PointerEvent): void => {
+    if (this.isEditableTarget(event.target)) {
+      return;
+    }
     this.options.controller.pointerMove(this.screenPoint(event), event);
   };
 
   private onPointerUp = (event: PointerEvent): void => {
+    if (this.isEditableTarget(event.target)) {
+      return;
+    }
     this.options.controller.pointerUp(this.screenPoint(event), event);
+    if (this.options.el.hasPointerCapture?.(event.pointerId)) {
+      this.options.el.releasePointerCapture(event.pointerId);
+    }
+  };
+
+  private onDoubleClick = (event: MouseEvent): void => {
+    if (this.isEditableTarget(event.target)) {
+      return;
+    }
+    event.preventDefault();
+    this.options.controller.doubleClick(this.screenPoint(event));
+  };
+
+  private onKeyDown = (event: KeyboardEvent): void => {
+    const action = this.shortcutMapper.actionFor(event);
+    if (!action) {
+      return;
+    }
+
+    event.preventDefault();
+    this.options.controller.executeShortcut(action);
   };
 
   private onWheel = (event: WheelEvent): void => {
@@ -80,7 +122,7 @@ export class CanvasInteractionController {
     this.options.controller.panBy(-event.deltaX, -event.deltaY);
   };
 
-  private screenPoint(event: MouseEvent): Point {
+  private screenPoint(event: MouseEvent): CanvasPoint {
     const rect = this.options.el.getBoundingClientRect();
 
     return {
@@ -88,6 +130,18 @@ export class CanvasInteractionController {
 
       y: event.clientY - rect.top,
     };
+  }
+
+  private isEditableTarget(target: EventTarget | null): boolean {
+    if (!(target instanceof HTMLElement)) {
+      return false;
+    }
+    return (
+      target.isContentEditable ||
+      target instanceof HTMLInputElement ||
+      target instanceof HTMLTextAreaElement ||
+      target instanceof HTMLSelectElement
+    );
   }
 
   private onGestureStart = (event: Event): void => {
@@ -99,7 +153,7 @@ export class CanvasInteractionController {
     event.preventDefault();
     const gesture = event as SafariGestureEvent;
     const rect = this.options.el.getBoundingClientRect();
-    const point: Point = {
+    const point: CanvasPoint = {
       x: gesture.clientX - rect.left,
 
       y: gesture.clientY - rect.top,

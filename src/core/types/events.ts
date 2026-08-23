@@ -1,13 +1,10 @@
 import type { DragSession } from "../model/drag";
-import type { Point } from "./geometry";
+import type { CanvasPoint } from "./geometry";
 
 export type BoardDrag =
   | { type: "card"; id: string; session: DragSession }
-  | { type: "pan-board"; start: Point; origin: Point }
+  | { type: "pan-board"; start: CanvasPoint; origin: CanvasPoint }
   | { type: "draw-card"; originX: number; originY: number; currentX: number; currentY: number }
-  | { type: "link-card"; fromId: string; routing: LinkRouting; current: Point }
-  | { type: "bend-link"; id: string; originBend: number; start: Point }
-  | { type: "rebind-link"; id: string; side: "start" | "end" }
   | {
       type: "marquee-cards";
       originX: number;
@@ -15,7 +12,6 @@ export type BoardDrag =
       currentX: number;
       currentY: number;
       initialIds: string[];
-      initialLinkIds: string[];
       additive: boolean;
     }
   | {
@@ -30,41 +26,10 @@ export type BoardDrag =
       pointerY: number;
     };
 
-export type ResizeCorner = "topLeft" | "topRight" | "bottomRight" | "bottomLeft";
+export type ResizeHandle =
+  "left" | "right" | "top" | "bottom" | "topLeft" | "topRight" | "bottomRight" | "bottomLeft";
 
-export type DetailDrag =
-  | { type: "move-elements"; session: DragSession }
-  | { type: "bend-element-arrow"; id: string; originBend: number; start: Point }
-  | {
-      type: "resize-element";
-      id: string;
-      corner: ResizeCorner;
-      start: Point;
-      origin: { x: number; y: number; width: number; height: number };
-    }
-  | {
-      type: "rotate-element";
-      id: string;
-      center: Point;
-      startAngle: number;
-      originRotation: number;
-    }
-  | { type: "draw-path"; id: string }
-  | { type: "draw-line"; id: string }
-  | { type: "draw-element"; kind: "text" | "rect" | "ellipse"; origin: Point; current: Point }
-  | { type: "draw-arrow"; fromElementId: string; current: Point }
-  | { type: "select-text"; elementId: string }
-  | {
-      type: "crop-image";
-      corner: ResizeCorner;
-      start: Point;
-      origin: { x: number; y: number; width: number; height: number };
-    }
-  | { type: "marquee"; origin: Point; current: Point }
-  | { type: "pan-detail"; start: Point; origin: Point };
-
-export type LinkRouting = "straight" | "bezier" | "orthogonal";
-export type LinkHead = "none" | "triangle" | "triangle-outline" | "chicken";
+export type ResizeCorner = Exclude<ResizeHandle, "left" | "right">;
 
 export type EditState = {
   cardId: string;
@@ -80,8 +45,6 @@ export type MenuAction =
   | "delete-selection"
   | "enter-detail"
   | "exit-detail"
-  | "link-bezier"
-  | "link-orthogonal"
   | "reload-canvas"
   | "select-all"
   | "edit-element"
@@ -94,7 +57,7 @@ export type CanvasTool =
   | "mouse"
   | "hand"
   | "text"
-  | "link"
+  | "markdown"
   | "card"
   | "image"
   | "select"
@@ -103,7 +66,9 @@ export type CanvasTool =
   | "line"
   | "rect"
   | "ellipse"
+  | "diamond"
+  | "pentagon"
+  | "parallelogram"
   | "add";
 export type CardIndexItem = { minX: number; minY: number; maxX: number; maxY: number; id: string };
-export type LinkIndexItem = CardIndexItem;
 export type ElementIndexItem = CardIndexItem & { z: number };

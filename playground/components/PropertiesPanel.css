@@ -1,0 +1,96 @@
+.canvas-properties {
+  position: absolute;
+  top: 76px;
+  left: 18px;
+  z-index: 45;
+  width: 224px;
+  max-height: calc(100vh - 96px);
+  overflow: auto;
+  border: 1px solid rgba(148, 163, 184, 0.38);
+  border-radius: 12px;
+  color: #334155;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow:
+    0 12px 34px rgba(15, 23, 42, 0.14),
+    0 2px 7px rgba(15, 23, 42, 0.07);
+  backdrop-filter: blur(14px);
+}
+
+.canvas-properties__title {
+  padding: 12px 13px 10px;
+  border-bottom: 1px solid #e2e8f0;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.canvas-properties__fields {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.canvas-properties__field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 108px;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.canvas-properties__field > input[type="number"],
+.canvas-properties__field > select {
+  box-sizing: border-box;
+  width: 108px;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  color: #334155;
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.canvas-properties__field > input:focus-visible,
+.canvas-properties__field > select:focus-visible {
+  border-color: #3b82f6;
+  outline: 2px solid rgba(59, 130, 246, 0.2);
+}
+
+.canvas-properties__color-control {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.canvas-properties__color-control input {
+  box-sizing: border-box;
+  width: 30px;
+  height: 30px;
+  padding: 2px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.canvas-properties__checkbox {
+  width: 17px;
+  height: 17px;
+  margin-left: auto;
+  accent-color: #2563eb;
+}
+
+@media (max-width: 680px) {
+  .canvas-properties {
+    top: 70px;
+    left: 12px;
+    width: 204px;
+  }
+}

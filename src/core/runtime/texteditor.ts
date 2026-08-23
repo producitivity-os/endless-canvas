@@ -1,4 +1,4 @@
-import type { CanvasElement } from "../types/elements";
+import type { CanvasObject } from "../model";
 
 export type TextEditTarget = {
   cardId: string;
@@ -21,16 +21,9 @@ export type TextEditState = {
 };
 
 export interface CanvasTextEditorOptions {
-  getElement(
-    cardId: string,
-    elementId: string,
-  ): CanvasElement | undefined;
+  getElement(cardId: string, elementId: string): CanvasObject | undefined;
 
-  updateElementText(
-    cardId: string,
-    elementId: string,
-    text: string,
-  ): void;
+  updateElementText(cardId: string, elementId: string, text: string): void;
 
   beginHistory(): void;
   commitHistory(): void;
@@ -44,10 +37,8 @@ export class CanvasTextEditor {
   private state: TextEditState | null = null;
 
   private readonly options: CanvasTextEditorOptions;
-  constructor(
-    options: CanvasTextEditorOptions
-  ) {
-    this.options = options
+  constructor(options: CanvasTextEditorOptions) {
+    this.options = options;
   }
 
   get active(): boolean {
@@ -67,10 +58,7 @@ export class CanvasTextEditor {
       return 0;
     }
 
-    return Math.min(
-      this.state.selection.anchor,
-      this.state.selection.focus,
-    );
+    return Math.min(this.state.selection.anchor, this.state.selection.focus);
   }
 
   get selectionEnd(): number {
@@ -78,52 +66,37 @@ export class CanvasTextEditor {
       return 0;
     }
 
-    return Math.max(
-      this.state.selection.anchor,
-      this.state.selection.focus,
-    );
+    return Math.max(this.state.selection.anchor, this.state.selection.focus);
   }
 
   get hasSelection(): boolean {
     return this.selectionStart !== this.selectionEnd;
   }
 
-  start(
-    target: TextEditTarget,
-    cursor?: number,
-  ): void {
+  start(target: TextEditTarget, cursor?: number): void {
+    void cursor;
     this.commit();
 
-    const element = this.options.getElement(
-      target.cardId,
-      target.elementId,
-    );
+    const element = this.options.getElement(target.cardId, target.elementId);
 
     if (!element || element.type !== "text") {
       return;
     }
 
-    const text = element.text ?? "";
-
-    const position =
-      cursor ?? text.length;
-
-    this.options.beginHistory();
-
-    this.state = {
-      target,
-
-      text,
-
-      selection: {
-        anchor: position,
-        focus: position,
-      },
-
-      composing: false,
-    };
-
-    this.options.refresh();
+    // const text = element.text ?? "";
+    // const position = cursor ?? text.length;
+    // this.options.beginHistory();
+    // this.state = {
+    //   target,
+    //   text,
+    //   selection: {
+    //     anchor: position,
+    //     focus: position,
+    //   },
+    //   composing: false,
+    // };
+    //
+    // this.options.refresh();
   }
 
   commit(): void {
@@ -151,10 +124,7 @@ export class CanvasTextEditor {
     this.options.refresh();
   }
 
-  setSelection(
-    anchor: number,
-    focus = anchor,
-  ): void {
+  setSelection(anchor: number, focus = anchor): void {
     const state = this.state;
 
     if (!state) {
@@ -163,11 +133,9 @@ export class CanvasTextEditor {
 
     const length = state.text.length;
 
-    state.selection.anchor =
-      clamp(anchor, 0, length);
+    state.selection.anchor = clamp(anchor, 0, length);
 
-    state.selection.focus =
-      clamp(focus, 0, length);
+    state.selection.focus = clamp(focus, 0, length);
 
     this.options.refresh();
   }
@@ -180,25 +148,19 @@ export class CanvasTextEditor {
     }
 
     state.selection.anchor = 0;
-    state.selection.focus =
-      state.text.length;
+    state.selection.focus = state.text.length;
 
     this.options.refresh();
   }
 
-  collapseSelection(
-    direction: "start" | "end",
-  ): void {
+  collapseSelection(direction: "start" | "end"): void {
     const state = this.state;
 
     if (!state) {
       return;
     }
 
-    const position =
-      direction === "start"
-        ? this.selectionStart
-        : this.selectionEnd;
+    const position = direction === "start" ? this.selectionStart : this.selectionEnd;
 
     state.selection.anchor = position;
     state.selection.focus = position;
@@ -206,9 +168,7 @@ export class CanvasTextEditor {
     this.options.refresh();
   }
 
-  replaceSelection(
-    replacement: string,
-  ): void {
+  replaceSelection(replacement: string): void {
     const state = this.state;
 
     if (!state) {
@@ -218,13 +178,9 @@ export class CanvasTextEditor {
     const start = this.selectionStart;
     const end = this.selectionEnd;
 
-    state.text =
-      state.text.slice(0, start) +
-      replacement +
-      state.text.slice(end);
+    state.text = state.text.slice(0, start) + replacement + state.text.slice(end);
 
-    const cursor =
-      start + replacement.length;
+    const cursor = start + replacement.length;
 
     state.selection.anchor = cursor;
     state.selection.focus = cursor;
@@ -249,18 +205,13 @@ export class CanvasTextEditor {
       return;
     }
 
-    const cursor =
-      state.selection.focus;
+    const cursor = state.selection.focus;
 
     if (cursor <= 0) {
       return;
     }
 
-    const previous =
-      previousCodePointIndex(
-        state.text,
-        cursor,
-      );
+    const previous = previousCodePointIndex(state.text, cursor);
 
     state.selection.anchor = previous;
     state.selection.focus = cursor;
@@ -280,18 +231,13 @@ export class CanvasTextEditor {
       return;
     }
 
-    const cursor =
-      state.selection.focus;
+    const cursor = state.selection.focus;
 
     if (cursor >= state.text.length) {
       return;
     }
 
-    const next =
-      nextCodePointIndex(
-        state.text,
-        cursor,
-      );
+    const next = nextCodePointIndex(state.text, cursor);
 
     state.selection.anchor = cursor;
     state.selection.focus = next;
@@ -311,14 +257,9 @@ export class CanvasTextEditor {
       return;
     }
 
-    const cursor =
-      state.selection.focus;
+    const cursor = state.selection.focus;
 
-    const start =
-      previousWordBoundary(
-        state.text,
-        cursor,
-      );
+    const start = previousWordBoundary(state.text, cursor);
 
     state.selection.anchor = start;
     state.selection.focus = cursor;
@@ -338,14 +279,9 @@ export class CanvasTextEditor {
       return;
     }
 
-    const cursor =
-      state.selection.focus;
+    const cursor = state.selection.focus;
 
-    const end =
-      nextWordBoundary(
-        state.text,
-        cursor,
-      );
+    const end = nextWordBoundary(state.text, cursor);
 
     state.selection.anchor = cursor;
     state.selection.focus = end;
@@ -354,13 +290,7 @@ export class CanvasTextEditor {
   }
 
   moveCursor(
-    direction:
-      | "left"
-      | "right"
-      | "word-left"
-      | "word-right"
-      | "start"
-      | "end",
+    direction: "left" | "right" | "word-left" | "word-right" | "start" | "end",
     extend = false,
   ): void {
     const state = this.state;
@@ -369,38 +299,25 @@ export class CanvasTextEditor {
       return;
     }
 
-    const current =
-      state.selection.focus;
+    const current = state.selection.focus;
 
     let next = current;
 
     switch (direction) {
       case "left":
-        next = previousCodePointIndex(
-          state.text,
-          current,
-        );
+        next = previousCodePointIndex(state.text, current);
         break;
 
       case "right":
-        next = nextCodePointIndex(
-          state.text,
-          current,
-        );
+        next = nextCodePointIndex(state.text, current);
         break;
 
       case "word-left":
-        next = previousWordBoundary(
-          state.text,
-          current,
-        );
+        next = previousWordBoundary(state.text, current);
         break;
 
       case "word-right":
-        next = nextWordBoundary(
-          state.text,
-          current,
-        );
+        next = nextWordBoundary(state.text, current);
         break;
 
       case "start":
@@ -422,15 +339,12 @@ export class CanvasTextEditor {
     this.options.refresh();
   }
 
-  setComposing(
-    composing: boolean,
-  ): void {
+  setComposing(composing: boolean): void {
     if (!this.state) {
       return;
     }
 
-    this.state.composing =
-      composing;
+    this.state.composing = composing;
   }
 
   private flushText(): void {
@@ -440,130 +354,66 @@ export class CanvasTextEditor {
       return;
     }
 
-    this.options.updateElementText(
-      state.target.cardId,
-      state.target.elementId,
-      state.text,
-    );
+    this.options.updateElementText(state.target.cardId, state.target.elementId, state.text);
   }
 }
 
-function previousWordBoundary(
-  text: string,
-  index: number,
-): number {
-  let cursor = clamp(
-    index,
-    0,
-    text.length,
-  );
+function previousWordBoundary(text: string, index: number): number {
+  let cursor = clamp(index, 0, text.length);
 
-  while (
-    cursor > 0 &&
-    /\s/.test(
-      text[cursor - 1],
-    )
-  ) {
+  while (cursor > 0 && /\s/.test(text[cursor - 1])) {
     cursor--;
   }
 
-  while (
-    cursor > 0 &&
-    !/\s/.test(
-      text[cursor - 1],
-    )
-  ) {
+  while (cursor > 0 && !/\s/.test(text[cursor - 1])) {
     cursor--;
   }
 
   return cursor;
 }
 
-function nextWordBoundary(
-  text: string,
-  index: number,
-): number {
-  let cursor = clamp(
-    index,
-    0,
-    text.length,
-  );
+function nextWordBoundary(text: string, index: number): number {
+  let cursor = clamp(index, 0, text.length);
 
-  while (
-    cursor < text.length &&
-    /\s/.test(
-      text[cursor],
-    )
-  ) {
+  while (cursor < text.length && /\s/.test(text[cursor])) {
     cursor++;
   }
 
-  while (
-    cursor < text.length &&
-    !/\s/.test(
-      text[cursor],
-    )
-  ) {
+  while (cursor < text.length && !/\s/.test(text[cursor])) {
     cursor++;
   }
 
   return cursor;
 }
 
-function previousCodePointIndex(
-  text: string,
-  index: number,
-): number {
+function previousCodePointIndex(text: string, index: number): number {
   if (index <= 0) {
     return 0;
   }
 
-  const previous =
-    text.codePointAt(index - 1);
+  const previous = text.codePointAt(index - 1);
 
-  if (
-    previous !== undefined &&
-    previous >= 0xdc00 &&
-    previous <= 0xdfff &&
-    index >= 2
-  ) {
+  if (previous !== undefined && previous >= 0xdc00 && previous <= 0xdfff && index >= 2) {
     return index - 2;
   }
 
   return index - 1;
 }
 
-function nextCodePointIndex(
-  text: string,
-  index: number,
-): number {
+function nextCodePointIndex(text: string, index: number): number {
   if (index >= text.length) {
     return text.length;
   }
 
-  const codePoint =
-    text.codePointAt(index);
+  const codePoint = text.codePointAt(index);
 
-  if (
-    codePoint !== undefined &&
-    codePoint > 0xffff
-  ) {
-    return Math.min(
-      text.length,
-      index + 2,
-    );
+  if (codePoint !== undefined && codePoint > 0xffff) {
+    return Math.min(text.length, index + 2);
   }
 
   return index + 1;
 }
 
-function clamp(
-  value: number,
-  min: number,
-  max: number,
-): number {
-  return Math.max(
-    min,
-    Math.min(max, value),
-  );
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
 }

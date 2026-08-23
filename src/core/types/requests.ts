@@ -1,7 +1,5 @@
-import type { CanvasLink } from "../model/arrow";
-import type { CanvasCard } from "../model/card";
+import type { CanvasCardObject } from "../model/card";
 import type { CanvasViewport } from "./canvas";
-
 
 export interface CreateCanvasBoardRequest {
   name: string;
@@ -26,8 +24,7 @@ export interface LoadCanvasStoreRequest {
 
 export interface SaveCanvasStoreRequest {
   boardId: string;
-  cards: CanvasCard[];
-  links: CanvasLink[];
+  cards: CanvasCardObject[];
   viewport: CanvasViewport;
 }
 
@@ -40,5 +37,3 @@ export interface UploadedCanvasImage {
   url: string;
   name: string;
 }
-
-

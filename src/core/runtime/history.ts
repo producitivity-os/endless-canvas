@@ -1,24 +1,29 @@
+import type { CanvasHistoryState } from "../types/extensions.ts";
+
 export interface CanvasHistoryOptions<TSnapshot> {
   capture(): TSnapshot;
   restore(snapshot: TSnapshot): void;
-
+  equals?(left: TSnapshot, right: TSnapshot): boolean;
   maxEntries?: number;
-
+  onRestore?: () => void;
+  onStateChange?: (state: CanvasHistoryState) => void;
+  /** @deprecated Use onStateChange. */
   onChange?: () => void;
 }
 
 export class CanvasHistoryController<TSnapshot> {
   private readonly undoStack: TSnapshot[] = [];
   private readonly redoStack: TSnapshot[] = [];
-
   private pendingSnapshot: TSnapshot | null = null;
-
+  private presentSnapshot: TSnapshot;
   private readonly maxEntries: number;
-
   private readonly options: CanvasHistoryOptions<TSnapshot>;
+
   constructor(options: CanvasHistoryOptions<TSnapshot>) {
     this.options = options;
     this.maxEntries = options.maxEntries ?? 100;
+    this.presentSnapshot = options.capture();
+    this.notifyState();
   }
 
   get canUndo(): boolean {
@@ -33,40 +38,33 @@ export class CanvasHistoryController<TSnapshot> {
     return this.pendingSnapshot !== null;
   }
 
-  begin(): void {
-    if (this.pendingSnapshot !== null) {
-      return;
-    }
-
-    this.pendingSnapshot = this.options.capture();
+  get state(): CanvasHistoryState {
+    return { canUndo: this.canUndo, canRedo: this.canRedo };
   }
 
-  commit(): void {
-    if (this.pendingSnapshot === null) {
-      return;
-    }
+  begin(): void {
+    this.pendingSnapshot ??= this.options.capture();
+  }
 
-    this.undoStack.push(this.pendingSnapshot);
-
+  commit(): boolean {
+    const before = this.pendingSnapshot;
+    if (before === null) return false;
     this.pendingSnapshot = null;
+    return this.recordFrom(before);
+  }
 
-    this.redoStack.length = 0;
-
-    this.trimUndoStack();
-
-    this.options.onChange?.();
+  record(): boolean {
+    return this.recordFrom(this.presentSnapshot);
   }
 
   cancel(): void {
-    if (this.pendingSnapshot === null) {
-      return;
-    }
-
-    this.options.restore(this.pendingSnapshot);
-
+    const snapshot = this.pendingSnapshot;
+    if (snapshot === null) return;
     this.pendingSnapshot = null;
-
-    this.options.onChange?.();
+    this.presentSnapshot = snapshot;
+    this.options.restore(snapshot);
+    this.options.onRestore?.();
+    this.notifyState();
   }
 
   discard(): void {
@@ -74,65 +72,62 @@ export class CanvasHistoryController<TSnapshot> {
   }
 
   undo(): boolean {
-    if (!this.canUndo) {
-      return false;
-    }
-
-    this.pendingSnapshot = null;
-
-    const current = this.options.capture();
-
     const previous = this.undoStack.pop();
-
-    if (!previous) {
-      return false;
-    }
-
-    this.redoStack.push(current);
-
+    if (!previous) return false;
+    this.pendingSnapshot = null;
+    this.redoStack.push(this.options.capture());
+    this.presentSnapshot = previous;
     this.options.restore(previous);
-
-    this.options.onChange?.();
-
+    this.options.onRestore?.();
+    this.notifyState();
     return true;
   }
 
   redo(): boolean {
-    if (!this.canRedo) {
-      return false;
-    }
-
-    this.pendingSnapshot = null;
-
-    const current = this.options.capture();
-
     const next = this.redoStack.pop();
-
-    if (!next) {
-      return false;
-    }
-
-    this.undoStack.push(current);
-
+    if (!next) return false;
+    this.pendingSnapshot = null;
+    this.undoStack.push(this.options.capture());
+    this.trimUndoStack();
+    this.presentSnapshot = next;
     this.options.restore(next);
-
-    this.options.onChange?.();
-
+    this.options.onRestore?.();
+    this.notifyState();
     return true;
   }
 
   clear(): void {
     this.undoStack.length = 0;
     this.redoStack.length = 0;
-
     this.pendingSnapshot = null;
+    this.presentSnapshot = this.options.capture();
+    this.notifyState();
+  }
 
-    this.options.onChange?.();
+  private recordFrom(before: TSnapshot): boolean {
+    const current = this.options.capture();
+    if (this.equals(before, current)) {
+      this.presentSnapshot = current;
+      return false;
+    }
+    this.undoStack.push(before);
+    this.trimUndoStack();
+    this.redoStack.length = 0;
+    this.presentSnapshot = current;
+    this.notifyState();
+    return true;
+  }
+
+  private equals(left: TSnapshot, right: TSnapshot): boolean {
+    return this.options.equals?.(left, right) ?? JSON.stringify(left) === JSON.stringify(right);
   }
 
   private trimUndoStack(): void {
-    while (this.undoStack.length > this.maxEntries) {
-      this.undoStack.shift();
-    }
+    while (this.undoStack.length > this.maxEntries) this.undoStack.shift();
+  }
+
+  private notifyState(): void {
+    this.options.onStateChange?.(this.state);
+    this.options.onChange?.();
   }
 }

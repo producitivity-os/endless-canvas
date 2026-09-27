@@ -1,0 +1,142 @@
+:root {
+  --canvas-toolbar-background: rgba(255, 255, 255, 0.96);
+  --canvas-toolbar-border: rgba(30, 32, 36, 0.14);
+  --canvas-toolbar-foreground: #61646b;
+  --canvas-toolbar-dropdown-foreground: #4f535b;
+  --canvas-toolbar-hover: #e8ebf3;
+  --canvas-toolbar-hover-foreground: #365daa;
+  --canvas-toolbar-shadow: rgba(27, 31, 27, 0.12);
+  --canvas-tool-menu-background: #ffffff;
+  --canvas-tool-menu-foreground: #252525;
+  --canvas-tool-menu-icon: #3b82f6;
+}
+
+.dark {
+  --canvas-toolbar-background: #292929;
+  --canvas-toolbar-border: rgba(255, 255, 255, 0.12);
+  --canvas-toolbar-foreground: #999999;
+  --canvas-toolbar-dropdown-foreground: #d0d0d0;
+  --canvas-toolbar-hover: #3d3d3d;
+  --canvas-toolbar-hover-foreground: #ffffff;
+  --canvas-toolbar-shadow: rgba(20, 25, 35, 0.22);
+  --canvas-tool-menu-background: #292929;
+  --canvas-tool-menu-foreground: #eeeeee;
+}
+
+.canvas-floating-toolbar {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--canvas-toolbar-border);
+  border-radius: 10px;
+  background: var(--canvas-toolbar-background);
+  box-shadow: 0 7px 22px var(--canvas-toolbar-shadow);
+  transform: translateX(-50%);
+}
+
+.canvas-floating-toolbar button {
+  display: grid;
+  width: 31px;
+  height: 31px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--canvas-toolbar-foreground);
+  outline: none;
+}
+
+.canvas-floating-toolbar button:hover,
+.canvas-floating-toolbar button:focus-visible {
+  background: var(--canvas-toolbar-hover);
+  color: var(--canvas-toolbar-hover-foreground);
+}
+
+.canvas-floating-toolbar button[data-active="true"] {
+  background: var(--sidebar-primary);
+  color: #ffffff;
+}
+
+.canvas-toolbar-split {
+  display: flex;
+  overflow: hidden;
+  border-radius: 7px;
+}
+
+.canvas-toolbar-split > button {
+  color: var(--canvas-toolbar-dropdown-foreground);
+}
+
+.canvas-toolbar-split > button.canvas-toolbar-main {
+  width: 27px;
+  border-radius: 7px 0 0 7px;
+}
+
+.canvas-toolbar-split > button.canvas-toolbar-chevron {
+  width: 16px;
+  border-radius: 0 7px 7px 0;
+}
+
+.canvas-toolbar-split > button.canvas-toolbar-chevron svg {
+  width: 10px;
+  height: 10px;
+}
+
+.canvas-toolbar-split[data-active="true"] {
+  background: var(--sidebar-primary);
+}
+
+.canvas-toolbar-split[data-active="true"] > button {
+  color: #ffffff;
+}
+
+.canvas-toolbar-split[data-active="true"] > button:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.canvas-tool-menu {
+  width: 43px !important;
+  min-width: 43px !important;
+  max-width: 43px;
+  border-color: var(--canvas-toolbar-border) !important;
+  background: var(--canvas-tool-menu-background) !important;
+  color: var(--canvas-tool-menu-foreground) !important;
+}
+
+.canvas-tool-menu [data-slot="dropdown-menu-item"],
+.canvas-tool-menu [data-slot="dropdown-menu-sub-trigger"] {
+  justify-content: center;
+  width: 33px;
+  height: 33px;
+  padding: 0;
+}
+
+.canvas-tool-menu [data-slot="dropdown-menu-sub-trigger"] > svg:last-child {
+  display: none;
+}
+
+.canvas-tool-menu [data-slot="dropdown-menu-item"]:hover,
+.canvas-tool-menu [data-slot="dropdown-menu-item"]:focus,
+.canvas-tool-menu [data-slot="dropdown-menu-item"][data-highlighted] {
+  background: var(--canvas-toolbar-hover) !important;
+}
+
+.canvas-tool-menu
+  :is([data-slot="dropdown-menu-item"], [data-slot="dropdown-menu-sub-trigger"])
+  > svg:first-child {
+  color: var(--canvas-tool-menu-icon);
+  fill: currentColor;
+  fill-opacity: 0.2;
+  stroke-width: 2.5;
+}
+
+.canvas-floating-toolbar svg {
+  width: 15px;
+  height: 15px;
+}

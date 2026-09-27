@@ -47,4 +47,42 @@ export class CanvasTextMetrics {
       ),
     };
   }
+
+  measureFixed(text: string, style: CanvasTextEditorStyle, width: number): CanvasTextSize {
+    this.context.font = `${style.italic ? "italic " : ""}${style.fontWeight} ${style.fontSize}px ${style.fontFamily}`;
+    const available = Math.max(1, width - style.padding * 2);
+    const hardLines = text.split("\n");
+    let visualLines = 0;
+    for (const hardLine of hardLines) {
+      if (!hardLine) {
+        visualLines++;
+        continue;
+      }
+      let lineWidth = 0;
+      for (const token of hardLine.match(/\S+\s*|\s+/g) ?? [hardLine]) {
+        const tokenWidth =
+          this.context.measureText(token).width +
+          Math.max(0, token.length - 1) * style.letterSpacing;
+        if (lineWidth > 0 && lineWidth + tokenWidth > available) {
+          visualLines++;
+          lineWidth = 0;
+        }
+        if (tokenWidth <= available) {
+          lineWidth += tokenWidth;
+          continue;
+        }
+        const wrapped = Math.max(1, Math.ceil(tokenWidth / available));
+        visualLines += wrapped - 1;
+        lineWidth = tokenWidth % available;
+      }
+      visualLines++;
+    }
+    return {
+      width,
+      height: Math.max(
+        Math.ceil(style.lineHeight + style.padding * 2),
+        Math.ceil(visualLines * style.lineHeight + style.padding * 2),
+      ),
+    };
+  }
 }

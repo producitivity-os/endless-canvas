@@ -6,7 +6,9 @@ export interface CanvasRenderContext {
   scale: number;
   editing?: boolean;
   hovered: boolean;
+  hoveredRegionId?: string;
   selected: boolean;
+  interactionColor: number;
   imageCrop?: CanvasImageCropPreview;
 }
 

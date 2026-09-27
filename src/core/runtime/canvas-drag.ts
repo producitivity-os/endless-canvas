@@ -1,8 +1,9 @@
 import type { CanvasPoint, ResizeHandle } from "../types";
 import type { ShapeParameterDragEvent } from "./shape-parameter-drag";
+import type { CanvasObject } from "../model";
 
 export type CanvasDragEventType =
-  "object" | "pan" | "draw-object" | "resize-object" | "rotate-object" | "adjust-shape-parameter";
+  "object" | "group-object" | "pan" | "draw-object" | "resize-object" | "rotate-object" | "adjust-shape-parameter";
 
 export interface OriginalObjectBounds {
   x: number;
@@ -17,6 +18,13 @@ export type CanvasDragEvent =
       objectId: string;
       pointerStart: CanvasPoint;
       objectStart: CanvasPoint;
+    }
+  | {
+      type: "group-object";
+      objectIds: string[];
+      pointerStart: CanvasPoint;
+      pointerPrevious: CanvasPoint;
+      originals: CanvasObject[];
     }
   | {
       type: "pan";

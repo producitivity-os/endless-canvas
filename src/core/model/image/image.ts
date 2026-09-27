@@ -1,7 +1,10 @@
 import { CanvasObject, type CanvasObjectInit } from "../object.ts";
 
 export type ImageObjectInit = CanvasObjectInit &
-  Omit<ImageObject, keyof Element | "type" | "moveTo" | "translate" | "bounds">;
+  Omit<
+    ImageObject,
+    keyof Element | "type" | "layerId" | "capabilities" | "moveTo" | "translate" | "bounds"
+  >;
 
 export interface CanvasImageCrop {
   x: number;

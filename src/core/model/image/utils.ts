@@ -1,7 +1,17 @@
 import { Container, Graphics, Texture } from "pixi.js";
-import { normalizeImageUrl } from "../../store/serialization";
 import type { CanvasCardObject } from "../card";
 import type { ImageObject, ImageRendererOptions } from "./image";
+import {
+  imageRequestNeedsCors,
+  imageSourceCandidates,
+  normalizeImageSource,
+} from "./image-url.ts";
+
+export {
+  imageRequestNeedsCors,
+  imageSourceCandidates,
+  normalizeImageSource,
+} from "./image-url.ts";
 
 export function imageDataUrlSize(dataUrl: string) {
   return new Promise<{ width: number; height: number }>((resolve, reject) => {
@@ -22,62 +32,118 @@ const failedAt = new Map<string, number>();
 const retryTimers = new Map<string, number>();
 const reportedErrors = new Set<string>();
 let options: ImageRendererOptions = {};
+const subscriptions = new Set<ImageRendererOptions>();
+let changeQueued = false;
+let textureRevision = 0;
+
+export function imageTextureRevision() {
+  return textureRevision;
+}
 
 export function configureImageRenderer(next: ImageRendererOptions) {
   options = next;
 }
 
-export function imageTextureFor(src: string) {
-  const url = normalizeImageUrl(src);
+export function subscribeImageRenderer(next: ImageRendererOptions) {
+  subscriptions.add(next);
+  return () => subscriptions.delete(next);
+}
+
+function notifyImageChange() {
+  textureRevision += 1;
+  if (changeQueued) return;
+  changeQueued = true;
+  queueMicrotask(() => {
+    changeQueued = false;
+    options.onChange?.();
+    for (const subscriber of subscriptions) subscriber.onChange?.();
+  });
+}
+
+function notifyImageError(message: string) {
+  options.onError?.(message);
+  for (const subscriber of subscriptions) subscriber.onError?.(message);
+}
+
+function imageTextureForSingle(src: string, reportFailure: boolean) {
+  const url = normalizeImageSource(src);
   if (!url) return null;
   const cached = textures.get(url);
   if (cached) return cached;
+  if (typeof Image === "undefined") return null;
   const lastFailure = failedAt.get(url) ?? 0;
   if (!loading.has(url) && performance.now() - lastFailure > 2400) {
     loading.add(url);
     failedAt.delete(url);
-    options.onChange?.();
+    notifyImageChange();
     const image = new Image();
-    if (!url.startsWith("data:") && !url.startsWith("blob:")) image.crossOrigin = "anonymous";
+    if (imageRequestNeedsCors(url)) image.crossOrigin = "anonymous";
     image.onload = () => {
-      loading.delete(url);
-      failedAt.delete(url);
-      reportedErrors.delete(url);
-      const timer = retryTimers.get(url);
-      if (timer) window.clearTimeout(timer);
-      retryTimers.delete(url);
-      textures.set(url, Texture.from(image));
-      options.onChange?.();
+      void (async () => {
+        try {
+          await image.decode?.();
+          const texture = Texture.from(image);
+          loading.delete(url);
+          failedAt.delete(url);
+          reportedErrors.delete(url);
+          const timer = retryTimers.get(url);
+          if (timer) window.clearTimeout(timer);
+          retryTimers.delete(url);
+          textures.set(url, texture);
+          notifyImageChange();
+        } catch {
+          failImageLoad(url, reportFailure);
+        }
+      })();
     };
-    image.onerror = () => {
-      loading.delete(url);
-      failedAt.set(url, performance.now());
-      if (!reportedErrors.has(url)) {
-        reportedErrors.add(url);
-        options.onError?.(`Image could not be loaded: ${url}`);
-      }
-      options.onChange?.();
-      if (!retryTimers.has(url))
-        retryTimers.set(
-          url,
-          window.setTimeout(() => {
-            retryTimers.delete(url);
-            imageTextureFor(url);
-          }, 2600),
-        );
-    };
+    image.onerror = () => failImageLoad(url, reportFailure);
     image.src = url;
   }
   return null;
 }
 
-export function imageLoadFailed(src: string) {
-  const url = normalizeImageUrl(src);
-  return Boolean(url && failedAt.has(url) && !loading.has(url));
+function failImageLoad(url: string, reportFailure: boolean) {
+  loading.delete(url);
+  failedAt.set(url, performance.now());
+  if (reportFailure && !reportedErrors.has(url)) {
+    reportedErrors.add(url);
+    notifyImageError(`Image could not be loaded: ${url}`);
+  }
+  notifyImageChange();
+  if (reportFailure && !retryTimers.has(url)) {
+    retryTimers.set(
+      url,
+      window.setTimeout(() => {
+        retryTimers.delete(url);
+        imageTextureForSingle(url, true);
+      }, 2600),
+    );
+  }
 }
-export function imageIsLoading(src: string) {
-  const url = normalizeImageUrl(src);
-  return Boolean(url && loading.has(url));
+
+export function imageTextureFor(src: string, fallbackSrc?: string) {
+  const [primary, fallback] = imageSourceCandidates(src, fallbackSrc);
+  if (!primary) return null;
+  const primaryTexture = imageTextureForSingle(primary, !fallback);
+  if (primaryTexture || !failedAt.has(normalizeImageSource(primary)) || !fallback) {
+    return primaryTexture;
+  }
+  return imageTextureForSingle(fallback, true);
+}
+
+export function imageLoadFailed(src: string, fallbackSrc?: string) {
+  const [primary, fallback] = imageSourceCandidates(src, fallbackSrc).map(normalizeImageSource);
+  if (!primary || textures.has(primary) || loading.has(primary) || !failedAt.has(primary)) {
+    return false;
+  }
+  if (!fallback) return true;
+  return !textures.has(fallback) && !loading.has(fallback) && failedAt.has(fallback);
+}
+
+export function imageIsLoading(src: string, fallbackSrc?: string) {
+  const [primary, fallback] = imageSourceCandidates(src, fallbackSrc).map(normalizeImageSource);
+  if (!primary) return false;
+  return loading.has(primary) || Boolean(fallback && failedAt.has(primary) && loading.has(fallback));
 }
 
 export function preloadCanvasImages(cards: CanvasCardObject[]) {
@@ -85,8 +151,8 @@ export function preloadCanvasImages(cards: CanvasCardObject[]) {
     for (const element of card.elements)
       if (element.type === "image") {
         const image = element as ImageObject;
-        const source = image.previewSrc || image.src;
-        if (source) imageTextureFor(source);
+        const [source, fallback] = imageSourceCandidates(image.previewSrc, image.src);
+        if (source) imageTextureFor(source, fallback);
       }
 }
 

@@ -1,6 +1,5 @@
 import { Graphics, type Container } from "pixi.js";
 import type { PathObject } from "../../model";
-import { theme } from "../theme";
 import type { CanvasRenderContext, ElementRenderer } from "./renderer";
 
 export class PathRenderer implements ElementRenderer<PathObject> {
@@ -15,7 +14,7 @@ export class PathRenderer implements ElementRenderer<PathObject> {
       path.lineTo(point.x, point.y);
     }
     path.stroke({
-      color: highlighted ? theme.interaction.hoverColor : pathObject.color,
+      color: highlighted ? context.interactionColor : pathObject.color,
       width: highlighted
         ? Math.max(pathObject.strokeWidth ?? 2.5, 2.5 / Math.max(context.scale, 0.001))
         : (pathObject.strokeWidth ?? 2.5),

@@ -7,10 +7,11 @@ import type { BaseTextObject, TextFont, TextVariant } from "./text";
 
 export function textFontFamily(font: TextFont) {
   if (font === "serif") return "Georgia, 'Times New Roman', serif";
-  if (font === "mono") return "'SFMono-Regular', Consolas, 'Liberation Mono', monospace";
+  if (font === "mono")
+    return "ui-monospace, 'SFMono-Regular', 'SF Mono', Menlo, Monaco, Consolas, monospace";
   if (font === "rounded")
     return "ui-rounded, 'SF Pro Rounded', 'Arial Rounded MT Bold', sans-serif";
-  return "Inter Variable, Inter, system-ui, sans-serif";
+  return "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', system-ui, sans-serif";
 }
 
 export function wrapText(value: string, maxChars: number) {
@@ -64,7 +65,7 @@ export function textCardElement(card: CanvasCardObject) {
     card.elements.length === 1 && card.elements[0]?.type === "text"
       ? (card.elements[0] as BaseTextObject)
       : null;
-  return card.kind === "text" || element?.textAlign === "center" ? element : null;
+  return card.textSizing || element?.textAlign === "center" ? element : null;
 }
 
 export function syncTextCardBounds(card: CanvasCardObject, verticalPadding: number) {

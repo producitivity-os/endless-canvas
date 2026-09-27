@@ -2,7 +2,6 @@ import { Graphics, type Container } from "pixi.js";
 import type { ArrowHead, ArrowObject, CanvasObject } from "../../model";
 import type { CanvasPoint } from "../../types";
 import { arrowHeadGeometry, arrowPathGeometry } from "../arrows";
-import { theme } from "../theme";
 import type { CanvasRenderContext } from "./renderer";
 
 export class ArrowRenderer {
@@ -15,7 +14,7 @@ export class ArrowRenderer {
     const path = arrowPathGeometry.resolve(arrow, objects);
     if (path.visible.length < 2) return;
     const highlighted = context.selected || context.hovered;
-    const color = highlighted ? theme.interaction.hoverColor : arrow.stroke;
+    const color = highlighted ? context.interactionColor : arrow.stroke;
     const width = highlighted
       ? Math.max(arrow.strokeWidth, 2.5 / Math.max(context.scale, 0.001))
       : arrow.strokeWidth;

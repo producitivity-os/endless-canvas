@@ -1,8 +1,7 @@
 import type { CanvasTool, EndlessCanvasOptions, EndlessCanvasState } from "@endless-canvas/core";
 import "./App.css";
-import { EndlessCanvas } from "@endless-canvas/react";
+import { CanvasToolbar, EndlessCanvas } from "@endless-canvas/react";
 import { useState } from "react";
-import { CanvasToolbar } from "./components/Toolbar";
 import { CanvasPropertiesPanel } from "./components/PropertiesPanel";
 
 const onError = (error: unknown) => {
@@ -29,7 +28,7 @@ function App() {
         propertiesSlot={(props) => <CanvasPropertiesPanel {...props} />}
       />
 
-      <CanvasToolbar value={tool} onChange={setTool} />
+      <CanvasToolbar tool={tool} onToolChange={setTool} />
     </div>
   );
 }

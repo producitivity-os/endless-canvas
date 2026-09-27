@@ -51,6 +51,7 @@ const HANDLE_DIRECTIONS: Record<ResizeHandle, { x: -1 | 0 | 1; y: -1 | 0 | 1 }> 
 
 export class SelectionHandles {
   descriptors(object: CanvasObject): readonly ResizeHandleDescriptor[] {
+    if (!object.capabilities.resizable) return [];
     if (shapeGeometry.isShape(object)) {
       return shapeGeometry.resizeHandles(object).map(({ handle, point }) => ({
         handle,
@@ -107,7 +108,7 @@ export class SelectionHandles {
   }
 
   rotationPoint(object: CanvasObject, scale: number): CanvasPoint | null {
-    if (this.descriptors(object).length === 0) {
+    if (!object.capabilities.rotatable || this.descriptors(object).length === 0) {
       return null;
     }
     const center = boxGeometry.center(object);

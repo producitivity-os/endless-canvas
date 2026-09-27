@@ -25,7 +25,9 @@ export class CanvasPropertyDefaults {
       this.values.set(tool, defaults);
     }
     this.values.set("markdown", { ...this.values.get("text"), format: "markdown" });
+    this.values.set("markdown-card", { ...this.values.get("card") });
     this.values.set("line", { ...this.values.get("arrow"), endHead: "none" });
+    this.values.set("image", { ...this.values.get("image"), cornerRadius: 0 });
     for (const [rawTool, patch] of Object.entries(initial)) {
       if (patch) this.apply(rawTool as CanvasTool, patch);
     }
@@ -55,6 +57,8 @@ export class CanvasPropertyDefaults {
       "text",
       "markdown",
       "card",
+      "markdown-card",
+      "video",
       "image",
       "arrow",
       "line",

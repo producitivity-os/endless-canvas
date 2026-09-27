@@ -14,7 +14,7 @@ export class ShapeRenderer implements ElementRenderer<BaseShapeObject> {
     const shape = this.drawOutline(shapeObject);
     const hovered = context.hovered && !context.selected;
     const highlighted = hovered || context.selected;
-    const highlightColor = theme.interaction.hoverColor;
+    const highlightColor = context.interactionColor;
 
     if ((shapeObject.fillStyle ?? "solid") !== "none") {
       shape.fill({

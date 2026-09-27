@@ -37,6 +37,8 @@ export type ArrowPath =
     };
 
 export interface ArrowObjectInit extends CanvasObjectInit {
+  name?: string;
+  description?: string;
   start?: ArrowEndpoint;
   end?: ArrowEndpoint;
   path?: ArrowPath;
@@ -58,6 +60,8 @@ export interface ArrowObjectInit extends CanvasObjectInit {
 
 export class ArrowObject extends CanvasObject {
   readonly type: CanvasObjectType = "arrow";
+  name: string;
+  description: string;
   start: ArrowEndpoint;
   end: ArrowEndpoint;
   path: ArrowPath;
@@ -69,6 +73,8 @@ export class ArrowObject extends CanvasObject {
 
   constructor(init: ArrowObjectInit) {
     super(init);
+    this.name = init.name ?? "Connection";
+    this.description = init.description ?? "";
     const legacyStart = init.startPoint ?? init.fromAnchor ?? { x: init.x, y: init.y };
     const legacyEnd = init.endPoint ??
       init.toAnchor ?? { x: init.x + init.width, y: init.y + init.height };

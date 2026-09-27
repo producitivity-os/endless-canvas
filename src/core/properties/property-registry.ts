@@ -36,6 +36,7 @@ const allObjectTypes: readonly CanvasObjectType[] = [
   "path",
   "arrow",
   "text",
+  "video",
 ];
 
 const shapeTypes: readonly CanvasObjectType[] = [
@@ -58,7 +59,9 @@ const creationTools: readonly CanvasTool[] = [
   "text",
   "markdown",
   "card",
+  "markdown-card",
   "image",
+  "video",
   "arrow",
   "line",
   "pencil",
@@ -226,7 +229,7 @@ const definitions = [
     label: "Background",
     control: "color",
     objectTypes: ["card"],
-    tools: ["card"],
+    tools: ["card", "markdown-card"],
     validate: colorValidator,
     defaultValue: 0xffffff,
   }),

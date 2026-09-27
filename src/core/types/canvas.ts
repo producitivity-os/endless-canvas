@@ -1,4 +1,4 @@
-import type { CanvasObject } from "../model";
+import type { CanvasLayer, CanvasObject } from "../model";
 
 export interface CanvasHealthStatus {
   healthy: boolean;
@@ -11,6 +11,14 @@ export interface CanvasBoard {
 
 export interface EndlessCanvasState {
   objects: CanvasObject[];
+  /** Optional while reading legacy states; normalized by EndlessCanvas on initialization. */
+  layers?: CanvasLayer[];
+  activeLayerId?: string;
+  focusedLayerId?: string | null;
+  /** Opacity multiplier applied to non-focused layers. */
+  unfocusedLayerOpacity?: number;
+  /** Persisted root viewport. */
+  viewport?: CanvasViewport;
 }
 
 export class CanvasViewport {

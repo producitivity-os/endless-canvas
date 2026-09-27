@@ -14,17 +14,22 @@ export class CanvasSelectionMutation {
 
   deleteSelection(): boolean {
     const selected = this.selection.objects;
-    if (selected.size === 0) {
+    const deletable = new Set(
+      this.state.objects
+        .filter((object) => selected.has(object.id) && (object.capabilities?.deletable ?? true))
+        .map((object) => object.id),
+    );
+    if (deletable.size === 0) {
       return false;
     }
 
     for (const object of this.state.objects) {
-      if (object.type !== "arrow" || selected.has(object.id)) {
+      if (object.type !== "arrow" || deletable.has(object.id)) {
         continue;
       }
       const arrow = object as ArrowObject;
       for (const endpoint of [arrow.start, arrow.end]) {
-        if (endpoint.binding && selected.has(endpoint.binding.objectId)) {
+        if (endpoint.binding && deletable.has(endpoint.binding.objectId)) {
           endpoint.point = arrowBindingResolver.resolve(endpoint, this.state.objects);
           endpoint.binding = undefined;
         }
@@ -33,15 +38,15 @@ export class CanvasSelectionMutation {
     }
 
     const originalCount = this.state.objects.length;
-    const retained = this.state.objects.filter((object) => !selected.has(object.id));
+    const retained = this.state.objects.filter((object) => !deletable.has(object.id));
     this.state.objects.splice(0, this.state.objects.length, ...retained);
     this.selection.clear();
     return originalCount !== this.state.objects.length;
   }
 
-  selectAll(): void {
+  selectAll(objects: readonly { id: string }[] = this.state.objects): void {
     this.selection.clear();
-    for (const object of this.state.objects) {
+    for (const object of objects) {
       this.selection.selectObject(object.id, true);
     }
   }

@@ -1,5 +1,6 @@
 export * from "./asset.ts";
 export * from "./clipboard.ts";
+export * from "./clipboard-image-codec.ts";
 export * from "./history.ts";
 export * from "./image-crop-session.ts";
 export * from "./selection.ts";
@@ -12,3 +13,8 @@ export * from "./marquee-selection.ts";
 export * from "./selection-mutation.ts";
 export * from "./shape-parameter-drag.ts";
 export * from "./pane-navigation.ts";
+export * from "./object-capability-policy.ts";
+export * from "./object-extension-registry.ts";
+export * from "./canvas-overview-publisher.ts";
+export * from "./canvas-viewport-fitter.ts";
+export * from "./pointer-gesture.ts";

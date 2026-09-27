@@ -1,10 +1,12 @@
 import type { CardIndexItem } from "../../types";
 import { CanvasObject, type CanvasObjectInit, type CanvasObjectType } from "../object.ts";
 import type { ArrowObject } from "../arrow";
+import type { CardTemplateValue } from "./template.ts";
 
 export interface CanvasCardInit extends CanvasObjectInit {
   id: string;
-  kind?: "text";
+  kind?: CanvasCardKind | "text";
+  markdown?: string;
   textSizing?: "fit" | "custom";
   x: number;
   y: number;
@@ -14,10 +16,22 @@ export interface CanvasCardInit extends CanvasObjectInit {
   arrows?: ArrowObject[];
   backgroundColor?: number;
   locked?: boolean;
+  templateId?: string;
+  templateValues?: Record<string, CardTemplateValue>;
+  revisionKind?: RevisionCardKind;
+  front?: string;
+  back?: string;
+  cloze?: string;
+  pluginId?: string;
+  pluginVersion?: number;
+  pluginData?: Record<string, unknown>;
 }
 
+export type CanvasCardKind = "canvas" | "markdown" | "template" | "revision" | "plugin";
+export type RevisionCardKind = "basic" | "cloze";
+
 export abstract class CanvasCardObject extends CanvasObject {
-  abstract kind?: "text";
+  abstract kind: CanvasCardKind;
   id: string;
   textSizing?: "fit" | "custom";
   x: number;
@@ -28,6 +42,7 @@ export abstract class CanvasCardObject extends CanvasObject {
   arrows?: ArrowObject[];
   backgroundColor?: number;
   locked: boolean;
+  markdown: string;
 
   constructor(init: CanvasCardInit) {
     super(init);
@@ -51,6 +66,7 @@ export abstract class CanvasCardObject extends CanvasObject {
     // );
     this.backgroundColor = init.backgroundColor;
     this.locked = init.locked ?? false;
+    this.markdown = init.markdown ?? "";
     this.type = "card";
   }
   type: CanvasObjectType;
@@ -106,14 +122,67 @@ export abstract class CanvasCardObject extends CanvasObject {
 }
 
 export class IllustrationCard extends CanvasCardObject {
-  kind = undefined;
+  kind = "canvas" as const;
 }
 export class TextCard extends CanvasCardObject {
-  kind = "text" as const;
+  kind = "canvas" as const;
+}
+export class MarkdownCard extends CanvasCardObject {
+  kind = "markdown" as const;
+}
+export class TemplateCard extends CanvasCardObject {
+  kind = "template" as const;
+  templateId: string;
+  templateValues: Record<string, CardTemplateValue>;
+
+  constructor(init: CanvasCardInit) {
+    super({
+      ...init,
+      capabilities: { ...init.capabilities, resizable: false },
+      elements: [],
+    });
+    this.templateId = init.templateId ?? "";
+    this.templateValues = structuredClone(init.templateValues ?? {});
+  }
+}
+
+export class RevisionCard extends CanvasCardObject {
+  kind = "revision" as const;
+  revisionKind: RevisionCardKind;
+  front: string;
+  back: string;
+  cloze: string;
+
+  constructor(init: CanvasCardInit) {
+    super({ ...init, elements: [] });
+    this.revisionKind = init.revisionKind ?? "basic";
+    this.front = init.front ?? "Question";
+    this.back = init.back ?? "Answer";
+    this.cloze = init.cloze ?? "A {{c1::cloze}} hides part of a fact.";
+  }
+}
+
+export class PluginCard extends CanvasCardObject {
+  kind = "plugin" as const;
+  pluginId: string;
+  pluginVersion: number;
+  pluginData: Record<string, unknown>;
+
+  constructor(init: CanvasCardInit) {
+    super({ ...init, elements: [] });
+    this.pluginId = init.pluginId ?? "";
+    this.pluginVersion = init.pluginVersion ?? 1;
+    this.pluginData = structuredClone(init.pluginData ?? {});
+  }
 }
 
 export function createCard(init: CanvasCardInit) {
-  return init.kind === "text" ? new TextCard(init) : new IllustrationCard(init);
+  if (init.kind === "markdown") return new MarkdownCard(init);
+  if (init.kind === "template") return new TemplateCard(init);
+  if (init.kind === "revision") return new RevisionCard(init);
+  if (init.kind === "plugin") return new PluginCard(init);
+  if (init.kind === "text") return new TextCard(init);
+  return new IllustrationCard(init);
 }
 
 export type BrowserMathJax = {

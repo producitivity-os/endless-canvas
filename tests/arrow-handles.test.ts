@@ -10,6 +10,7 @@ import { DiamondObject } from "../src/core/model/shapes/diamond.ts";
 import { PentagonObject } from "../src/core/model/shapes/pentagon.ts";
 import { ParallelogramObject } from "../src/core/model/shapes/parallelogram.ts";
 import { CanvasArrowInteraction } from "../src/core/runtime/arrow-interaction.ts";
+import { CanvasObjectInteraction } from "../src/core/runtime/object-interaction.ts";
 
 test("arrowhead geometry and shaft trimming remain fixed in world units", () => {
   const head = arrowHeadGeometry.resolve({ x: 100, y: 20 }, { x: 0, y: 20 });
@@ -92,4 +93,22 @@ test("every shape resize descriptor is circular without changing hit sizes", () 
     assert.ok(descriptors.every((descriptor) => descriptor.appearance === "circle"));
     assert.ok(descriptors.every((descriptor) => descriptor.hitSize === 18));
   }
+});
+
+test("non-rotatable objects expose no rotation handle or rotation drag", () => {
+  const rectangle = new RectangleObject({
+    id: "fixed",
+    type: "rect",
+    x: 0,
+    y: 0,
+    width: 100,
+    height: 80,
+    fill: 0,
+    stroke: 0,
+    capabilities: { rotatable: false },
+  });
+  const interaction = new CanvasObjectInteraction();
+
+  assert.equal(selectionHandles.rotationPoint(rectangle, 1), null);
+  assert.equal(interaction.createRotationDrag(rectangle, { x: 50, y: -24 }), null);
 });

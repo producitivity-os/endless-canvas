@@ -1,15 +1,17 @@
-import { boxGeometry } from "../engine/box-geometry";
-import { arrowPathGeometry, shapeGeometry, type ShapeParameterName } from "../engine";
+import { boxGeometry } from "../engine/box-geometry.ts";
+import { arrowPathGeometry } from "../engine/arrows/arrow-path-geometry.ts";
+import type { ShapeParameterName } from "../engine/shapes/geometry-types.ts";
+import { shapeGeometry } from "../engine/shapes/shape-geometry.ts";
 import {
   selectionHandles,
   type ResizeHandleDescriptor,
-} from "../engine/renderers/selection-handles";
-import { minCardWidth } from "../engine/utils";
-import { distanceToSegment } from "../engine/utils";
-import type { ArrowObject, CanvasObject, PathObject, RectangleObject } from "../model";
-import type { CanvasPoint, ResizeHandle } from "../types";
-import type { CanvasDragEvent } from "./canvas-drag";
-import { ShapeParameterDragSession } from "./shape-parameter-drag";
+} from "../engine/renderers/selection-handles.ts";
+import { distanceToSegment, minCardWidth } from "../engine/utils.ts";
+import type { ArrowObject, CanvasObject, PathObject, RectangleObject, TextObject } from "../model/index.ts";
+import type { CanvasPoint, ResizeHandle } from "../types/index.ts";
+import type { CanvasObjectMinimumSize } from "../types/extensions.ts";
+import type { CanvasDragEvent } from "./canvas-drag.ts";
+import { ShapeParameterDragSession } from "./shape-parameter-drag.ts";
 
 type ResizeObjectDrag = Extract<CanvasDragEvent, { type: "resize-object" }>;
 type RotateObjectDrag = Extract<CanvasDragEvent, { type: "rotate-object" }>;
@@ -64,6 +66,7 @@ export class CanvasObjectInteraction {
     point: CanvasPoint,
     scale: number,
   ): SelectionHandleHit | null {
+    if (selectedIds.size !== 1) return null;
     for (let index = objects.length - 1; index >= 0; index--) {
       const object = objects[index];
       if (!selectedIds.has(object.id)) {
@@ -100,7 +103,8 @@ export class CanvasObjectInteraction {
     };
   }
 
-  createRotationDrag(object: CanvasObject, point: CanvasPoint): RotateObjectDrag {
+  createRotationDrag(object: CanvasObject, point: CanvasPoint): RotateObjectDrag | null {
+    if (!object.capabilities.rotatable) return null;
     const originalBounds = object.bounds();
     const center = boxGeometry.center(originalBounds);
 
@@ -132,10 +136,11 @@ export class CanvasObjectInteraction {
     drag: ResizeObjectDrag,
     point: CanvasPoint,
     shiftKey: boolean,
+    extensionMinimum: CanvasObjectMinimumSize | null = null,
   ): void {
     const preserveAspectRatio = shiftKey;
-    const minimumWidth = object.type === "card" ? minCardWidth : 8;
-    const minimumHeight = 8;
+    const minimumWidth = Math.max(object.type === "card" ? minCardWidth : 8, extensionMinimum?.width ?? 0);
+    const minimumHeight = Math.max(8, extensionMinimum?.height ?? 0);
     const bounds = boxGeometry.resize(
       drag.handle,
       drag.originalBounds,
@@ -151,6 +156,11 @@ export class CanvasObjectInteraction {
     object.y = bounds.y;
     object.width = bounds.width;
     object.height = bounds.height;
+    if (object.type === "text") {
+      const text = object as TextObject;
+      text.sizing = "fixed";
+      text.minHeight = bounds.height;
+    }
     if (object.type === "rect") {
       const rectangle = object as RectangleObject;
       rectangle.cornerRadius = Math.min(
@@ -167,6 +177,7 @@ export class CanvasObjectInteraction {
     point: CanvasPoint,
     shiftKey: boolean,
   ): void {
+    if (!object.capabilities.rotatable) return;
     const center = boxGeometry.center(drag.originalBounds);
     const pointerAngle = Math.atan2(point.y - center.y, point.x - center.x);
     let angleDelta = pointerAngle - drag.previousPointerAngle;

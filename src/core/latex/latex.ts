@@ -1,12 +1,11 @@
 import { Texture } from "pixi.js";
-import mathjaxStartupUrl from "mathjax/startup.js?url";
+import mathjaxStartupUrl from "mathjax/tex-svg.js?url";
 
 type BrowserMathJax = {
   startup?: { promise?: Promise<void>; typeset?: boolean };
-  loader?: { load?: string[] };
-  output?: { font?: string };
   svg?: unknown;
   tex?: unknown;
+  options?: unknown;
   tex2svg?: (source: string, options?: { display?: boolean }) => Element;
 };
 type Size = { width: number; height: number };
@@ -21,10 +20,15 @@ const loading = new Set<string>();
 const failed = new Set<string>();
 const compileErrors = new Set<string>();
 let mathJaxPromise: Promise<BrowserMathJax> | null = null;
-let onChange: (() => void) | undefined;
+const changeListeners = new Set<() => void>();
 
 export function configureLatexRenderer(callback: () => void) {
-  onChange = callback;
+  changeListeners.clear();
+  changeListeners.add(callback);
+}
+export function subscribeLatexRenderer(callback: () => void): () => void {
+  changeListeners.add(callback);
+  return () => changeListeners.delete(callback);
 }
 export function hasLatexCompileError(source: string) {
   return compileErrors.has(source || "\\;");
@@ -108,9 +112,9 @@ export function latexTextureFor(source: string) {
       if (viewBox?.length === 4 && viewBox.every(Number.isFinite)) {
         viewBoxes.set(key, { width: viewBox[2], height: viewBox[3] });
         const inline = svg.cloneNode(true) as SVGElement;
-        const aspect = Math.max(0.25, viewBox[2] / Math.max(viewBox[3], 1));
-        inline.setAttribute("width", `${aspect}em`);
-        inline.setAttribute("height", "1em");
+        // MathJax emits width and height in ex units. Keeping both natural dimensions
+        // preserves the glyph scale for multi-line formulas instead of squeezing the
+        // complete expression into a forced one-em-high box.
         inline.setAttribute("aria-hidden", "true");
         inlineSvgs.set(key, new XMLSerializer().serializeToString(inline));
         const scale = Math.max(0.072, 64 / Math.max(1, viewBox[2]), 32 / Math.max(1, viewBox[3]));
@@ -126,21 +130,25 @@ export function latexTextureFor(source: string) {
           width: image.naturalWidth || image.width || texture.width,
           height: image.naturalHeight || image.height || texture.height,
         });
-        onChange?.();
+        notifyChange();
       };
       image.onerror = () => {
         loading.delete(key);
         failed.add(key);
-        onChange?.();
+        notifyChange();
       };
       image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(new XMLSerializer().serializeToString(svg))}`;
     })
     .catch(() => {
       loading.delete(key);
-      failed.add(key);
-      onChange?.();
+      if (compileErrors.has(key)) failed.add(key);
+      notifyChange();
     });
   return null;
+}
+
+function notifyChange(): void {
+  for (const listener of changeListeners) listener();
 }
 
 function ensureMathJax() {
@@ -148,14 +156,17 @@ function ensureMathJax() {
   if (mathJaxPromise) return mathJaxPromise;
   mathWindow.MathJax = {
     ...mathWindow.MathJax,
-    loader: { load: ["input/tex", "output/svg"] },
     startup: { typeset: false },
-    output: { font: "mathjax-newcm" },
     svg: { fontCache: "none" },
     tex: { packages: { "[+]": ["ams", "newcommand", "noundefined"] } },
+    options: {
+      enableSpeech: false,
+      enableEnrichment: false,
+      enableExplorer: false,
+    },
   };
-  mathJaxPromise = new Promise((resolve, reject) => {
-    const script = document.createElement("script");
+  const script = document.createElement("script");
+  const pending = new Promise<BrowserMathJax>((resolve, reject) => {
     script.src = mathjaxStartupUrl;
     script.async = true;
     script.onload = () =>
@@ -168,6 +179,11 @@ function ensureMathJax() {
       );
     script.onerror = () => reject(new Error("MathJax failed to load."));
     document.head.appendChild(script);
+  });
+  mathJaxPromise = pending.catch((error) => {
+    mathJaxPromise = null;
+    script.remove();
+    throw error;
   });
   return mathJaxPromise;
 }

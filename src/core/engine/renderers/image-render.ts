@@ -16,8 +16,10 @@ export class ImageRenderer implements ElementRenderer<ImageObject> {
     const root = new Container();
 
     const source = imageObject.previewSrc || imageObject.src;
-    const texture = imageTextureFor(source);
-    const loading = imageObject.uploadStatus === "uploading" || imageIsLoading(source);
+    const fallback = imageObject.previewSrc ? imageObject.src : undefined;
+    const texture = imageTextureFor(source, fallback);
+    const loading =
+      imageObject.uploadStatus === "uploading" || imageIsLoading(source, fallback);
     const radius = Math.max(
       0,
       Math.min(imageObject.cornerRadius ?? 0, imageObject.width / 2, imageObject.height / 2),
@@ -30,7 +32,7 @@ export class ImageRenderer implements ElementRenderer<ImageObject> {
         this.drawImage(root, texture, imageObject, radius);
       }
     } else {
-      const failed = imageLoadFailed(source);
+      const failed = imageLoadFailed(source, fallback);
 
       root.addChild(
         new Graphics()
@@ -62,7 +64,7 @@ export class ImageRenderer implements ElementRenderer<ImageObject> {
       const chromeScale = 1 / Math.max(context.scale, 0.001);
       root.addChild(
         new Graphics().roundRect(0, 0, imageObject.width, imageObject.height, radius).stroke({
-          color: theme.interaction.hoverColor,
+          color: context.interactionColor,
           width: theme.interaction.frameWidth * chromeScale,
         }),
       );
@@ -139,7 +141,7 @@ export class ImageRenderer implements ElementRenderer<ImageObject> {
 //     style: {
 //       fill: 0xffffff,
 //
-//       fontFamily: "Inter Variable, Inter, system-ui, sans-serif",
+//       fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif",
 //
 //       fontSize: 11,
 //

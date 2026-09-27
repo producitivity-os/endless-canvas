@@ -38,6 +38,18 @@ test("arrow endpoints snap to hints and preserve arbitrary relative bindings", (
   assert.deepEqual(arrowBindingResolver.resolve(relative, [host]), { x: 95, y: 64 });
 });
 
+test("custom connection catalogs restrict snapping to defined ports", () => {
+  const host = rectangle("defined-host", 20, 30);
+  const output = arrowBindingResolver.hintsFrom(host, [
+    { hint: "right", anchor: { x: 1, y: 0.5 }, direction: "output" },
+  ]);
+  const provider = () => output;
+  const right = arrowBindingResolver.endpointAt({ x: 121, y: 70 }, [host], 12, provider);
+  assert.equal(right.endpoint.binding?.hint, "right");
+  const top = arrowBindingResolver.endpointAt({ x: 70, y: 30 }, [host], 12, provider);
+  assert.equal(top.endpoint.binding, undefined);
+});
+
 test("between arrows clip to hosts and detach when a host is deleted", () => {
   const from = rectangle("from", 0, 0);
   const to = rectangle("to", 240, 0);
@@ -96,7 +108,8 @@ test("marquee uses containment left-to-right and crossing right-to-left", () => 
 
 test("markdown supports rich text, inert links, inline math, and bad delimiters", () => {
   const parser = new CanvasMarkdownParser(
-    (source, unmatched) => `<span class="${unmatched ? "math-error" : "math"}">${source}</span>`,
+    (source, unmatched, display) =>
+      `<span class="${unmatched ? "math-error" : display ? "math-block" : "math"}">${source}</span>`,
   );
   const html = parser.render(
     "# Heading\n\n**bold** [docs](https://example.com) $x^2$\n\n`$code$`\n\n- item",
@@ -109,4 +122,21 @@ test("markdown supports rich text, inert links, inline math, and bad delimiters"
   assert.match(html, /<code>\$code\$<\/code>/);
   assert.match(html, /<li>item<\/li>/);
   assert.match(parser.render("bad $formula"), /math-error/);
+});
+
+test("markdown supports parenthesized inline and multiline display math", () => {
+  const parser = new CanvasMarkdownParser(
+    (source, unmatched, display) =>
+      `<span data-display="${display}" data-error="${unmatched}">${source}</span>`,
+  );
+  const html = parser.render(
+    "Before \\(x + y\\)\n\n$$x^2 + y^2 = r^2$$\n\n$$\n\\frac{a}{b}\n$$\n\n\\[\n\\sum_{i=1}^{n} i\n\\]\n\nAfter",
+  );
+  assert.match(html, /data-display="false" data-error="false">x \+ y/);
+  assert.match(html, /canvas-md-math-block/);
+  assert.match(html, /data-display="true" data-error="false">x\^2 \+ y\^2 = r\^2/);
+  assert.match(html, /data-display="true" data-error="false">\\frac\{a\}\{b\}/);
+  assert.match(html, /data-display="true" data-error="false">\\sum_\{i=1\}\^\{n\} i/);
+  assert.match(parser.render("$$\nunclosed"), /data-error="true"/);
+  assert.match(parser.render("\\[\nunclosed"), /data-error="true"/);
 });

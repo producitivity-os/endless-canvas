@@ -21,7 +21,7 @@ export class CardContentFitter {
       return changed;
     }
 
-    const padding = card.kind === "text" ? fittedCardPadding : illustrationCardPadding;
+    const padding = card.textSizing ? fittedCardPadding : illustrationCardPadding;
     const rawOffset = { x: bounds.x - padding, y: bounds.y - padding };
     const offset = {
       x: Math.abs(rawOffset.x) < this.epsilon ? 0 : rawOffset.x,
@@ -36,6 +36,40 @@ export class CardContentFitter {
       Math.abs(card.height - height) >= this.epsilon;
     if (!changed) return false;
 
+    this.apply(card, offset, width, height);
+    return true;
+  }
+
+  expand(card: CanvasCardObject): boolean {
+    const bounds = canvasVisualBounds.forObjects(card.elements);
+    if (!bounds) return false;
+    const padding = card.textSizing ? fittedCardPadding : illustrationCardPadding;
+    const minimumX = Math.min(0, bounds.x - padding);
+    const minimumY = Math.min(0, bounds.y - padding);
+    const maximumX = Math.max(card.width, bounds.x + bounds.width + padding);
+    const maximumY = Math.max(card.height, bounds.y + bounds.height + padding);
+    const offset = {
+      x: Math.abs(minimumX) < this.epsilon ? 0 : minimumX,
+      y: Math.abs(minimumY) < this.epsilon ? 0 : minimumY,
+    };
+    const width = Math.max(minCardWidth, maximumX - offset.x);
+    const height = Math.max(minCardHeight, maximumY - offset.y);
+    const changed =
+      offset.x !== 0 ||
+      offset.y !== 0 ||
+      width > card.width + this.epsilon ||
+      height > card.height + this.epsilon;
+    if (!changed) return false;
+    this.apply(card, offset, width, height);
+    return true;
+  }
+
+  private apply(
+    card: CanvasCardObject,
+    offset: { x: number; y: number },
+    width: number,
+    height: number,
+  ): void {
     this.repositionCard(card, offset, width, height);
     for (const element of card.elements) {
       element.translate(-offset.x, -offset.y);
@@ -47,7 +81,6 @@ export class CardContentFitter {
       const end = arrowBindingResolver.resolveAndRemember(arrow.end, card.elements);
       arrow.updateBounds(start, end);
     }
-    return true;
   }
 
   private repositionCard(
@@ -80,4 +113,8 @@ export const cardContentFitter = new CardContentFitter();
 
 export function fitCardToContent(card: CanvasCardObject): boolean {
   return cardContentFitter.fit(card);
+}
+
+export function expandCardToContent(card: CanvasCardObject): boolean {
+  return cardContentFitter.expand(card);
 }

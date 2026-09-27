@@ -1,6 +1,13 @@
 import { Container, Rectangle, type Texture } from "pixi.js";
-import type { ArrowObject, CanvasCardObject, CanvasObject } from "../../model";
+import type { ArrowObject, CanvasCardObject, CanvasObject, ImageObject } from "../../model";
+import { imageLoadFailed, imageTextureFor } from "../../model/image/index.ts";
 import type { CanvasRenderContext } from "./renderer";
+
+function imagePreviewPending(image: ImageObject) {
+  const source = image.previewSrc || image.src;
+  const fallback = image.previewSrc ? image.src : undefined;
+  return Boolean(source) && !imageTextureFor(source, fallback) && !imageLoadFailed(source, fallback);
+}
 
 export interface CardPreviewRenderSource {
   generateTexture(target: Container, frame: Rectangle): Texture;
@@ -16,6 +23,9 @@ export interface CardPreviewRenderSource {
 export interface CardPreviewProvider {
   textureFor(card: CanvasCardObject): Texture | null;
   revision(cardId: string): number;
+  needsLivePreview(card: CanvasCardObject): boolean;
+  renderLive(target: Container, card: CanvasCardObject): void;
+  invalidate(cardOrId: CanvasCardObject | string): void;
 }
 
 export class CardPreviewCache implements CardPreviewProvider {
@@ -39,6 +49,25 @@ export class CardPreviewCache implements CardPreviewProvider {
     this.textures.set(card.id, texture);
     this.generations += 1;
     return texture;
+  }
+
+  needsLivePreview(card: CanvasCardObject): boolean {
+    return card.elements.some((element) => {
+      if (element.type === "text") {
+        return (element as unknown as { format?: string }).format === "markdown";
+      }
+      if (element.type === "image") {
+        return imagePreviewPending(element as ImageObject);
+      }
+      return element.type === "card" && (
+        (element as CanvasCardObject).kind === "markdown" ||
+        this.needsLivePreview(element as CanvasCardObject)
+      );
+    });
+  }
+
+  renderLive(target: Container, card: CanvasCardObject): void {
+    this.renderElements(target, card);
   }
 
   invalidate(cardOrId: CanvasCardObject | string): void {
@@ -72,10 +101,21 @@ export class CardPreviewCache implements CardPreviewProvider {
 
   private generate(card: CanvasCardObject): Texture {
     const target = new Container();
+    this.renderElements(target, card);
+    const texture = this.source.generateTexture(
+      target,
+      new Rectangle(0, 0, Math.max(1, card.width), Math.max(1, card.height)),
+    );
+    target.destroy({ children: true });
+    return texture;
+  }
+
+  private renderElements(target: Container, card: CanvasCardObject): void {
     const context: CanvasRenderContext = {
       scale: 1,
       hovered: false,
       selected: false,
+      interactionColor: 0x3b82f6,
     };
     const underArrows = card.elements.filter(
       (element): element is ArrowObject =>
@@ -89,16 +129,14 @@ export class CardPreviewCache implements CardPreviewProvider {
     for (const arrow of underArrows) {
       this.source.renderArrow(target, arrow, card.elements, context);
     }
-    for (const object of objects) this.source.renderElement(target, object, context);
+    for (const object of objects) {
+      const view = new Container();
+      target.addChild(view);
+      this.source.renderElement(view, object, context);
+    }
     for (const arrow of overArrows) {
       this.source.renderArrow(target, arrow, card.elements, context);
     }
-    const texture = this.source.generateTexture(
-      target,
-      new Rectangle(0, 0, Math.max(1, card.width), Math.max(1, card.height)),
-    );
-    target.destroy({ children: true });
-    return texture;
   }
 
   private collectCardIds(

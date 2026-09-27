@@ -3,10 +3,15 @@ import { arrowPathGeometry } from "../engine/arrows/arrow-path-geometry.ts";
 import { ArrowObject, type ArrowEndpoint, type ArrowHint } from "../model/arrow/arrow.ts";
 import type { CanvasObject } from "../model/object.ts";
 import { CanvasPropertyDefaults } from "../properties/property-defaults.ts";
+import type { CanvasPropertyPatch } from "../properties/types.ts";
 import type { CanvasArrowPreview, CanvasPoint } from "../types";
 
 export type ArrowTool = "arrow" | "line";
 export type ArrowEditHandle = "start" | "end" | "center" | "body";
+type ConnectionHintProvider = (
+  object: CanvasObject,
+  endpoint: "source" | "target",
+) => ReturnType<typeof arrowBindingResolver.hints> | null;
 
 interface ArrowEditSession {
   arrow: ArrowObject;
@@ -27,9 +32,14 @@ export class CanvasArrowInteraction {
   private hintObjectId: string | null = null;
   private hotHint: ArrowHint | null = null;
   private mutated = false;
+  private readonly connectionHints?: ConnectionHintProvider;
 
-  constructor(defaults: CanvasPropertyDefaults = new CanvasPropertyDefaults()) {
+  constructor(
+    defaults: CanvasPropertyDefaults = new CanvasPropertyDefaults(),
+    connectionHints?: ConnectionHintProvider,
+  ) {
     this.defaults = defaults;
+    this.connectionHints = connectionHints;
   }
 
   get creating(): boolean {
@@ -45,9 +55,23 @@ export class CanvasArrowInteraction {
     point: CanvasPoint,
     objects: readonly CanvasObject[],
     scale: number,
+    exactStart?: ArrowEndpoint,
+    overrides?: CanvasPropertyPatch,
   ): void {
-    const values = this.defaults.forTool(tool);
-    const start = arrowBindingResolver.endpointAt(point, objects, 12 / Math.max(scale, 0.001));
+    const values = { ...this.defaults.forTool(tool), ...overrides };
+    const snappedStart = arrowBindingResolver.endpointAt(
+      point,
+      objects,
+      12 / Math.max(scale, 0.001),
+      this.connectionHints ? (object) => this.connectionHints!(object, "source") : undefined,
+    );
+    const start = exactStart
+      ? {
+          endpoint: this.cloneEndpoint(exactStart),
+          object: null,
+          hotHint: exactStart.binding?.hint ?? null,
+        }
+      : snappedStart;
     this.draft = new ArrowObject({
       id: crypto.randomUUID(),
       type: "arrow",
@@ -72,7 +96,12 @@ export class CanvasArrowInteraction {
 
   updateCreation(point: CanvasPoint, objects: readonly CanvasObject[], scale: number): void {
     if (!this.draft) return;
-    const result = arrowBindingResolver.endpointAt(point, objects, 12 / Math.max(scale, 0.001));
+    const result = arrowBindingResolver.endpointAt(
+      point,
+      objects,
+      12 / Math.max(scale, 0.001),
+      this.connectionHints ? (object) => this.connectionHints!(object, "target") : undefined,
+    );
     this.draft.end = result.endpoint;
     this.draft.updateBounds(
       arrowBindingResolver.resolve(this.draft.start, objects),
@@ -106,7 +135,12 @@ export class CanvasArrowInteraction {
   }
 
   updateHint(point: CanvasPoint, objects: readonly CanvasObject[], scale: number): boolean {
-    const result = arrowBindingResolver.endpointAt(point, objects, 12 / Math.max(scale, 0.001));
+    const result = arrowBindingResolver.endpointAt(
+      point,
+      objects,
+      12 / Math.max(scale, 0.001),
+      this.connectionHints ? (object) => this.connectionHints!(object, "source") : undefined,
+    );
     const nextObjectId = result.object?.id ?? null;
     const changed = nextObjectId !== this.hintObjectId || result.hotHint !== this.hotHint;
     this.hintObjectId = nextObjectId;
@@ -159,7 +193,14 @@ export class CanvasArrowInteraction {
     if (!session) return false;
     const { arrow, handle } = session;
     if (handle === "start" || handle === "end") {
-      const result = arrowBindingResolver.endpointAt(point, objects, 12 / Math.max(scale, 0.001));
+      const result = arrowBindingResolver.endpointAt(
+        point,
+        objects,
+        12 / Math.max(scale, 0.001),
+        this.connectionHints
+          ? (object) => this.connectionHints!(object, handle === "start" ? "source" : "target")
+          : undefined,
+      );
       arrow[handle] = result.endpoint;
       this.hintObjectId = result.object?.id ?? null;
       this.hotHint = result.hotHint;

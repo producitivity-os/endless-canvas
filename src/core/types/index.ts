@@ -5,4 +5,5 @@ export * from "./geometry";
 export * from "./requests";
 export * from "./responses";
 export * from "./runtime";
+export * from "./extensions";
 export * from "./stores";

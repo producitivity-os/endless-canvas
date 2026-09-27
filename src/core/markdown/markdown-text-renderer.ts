@@ -4,11 +4,13 @@ import type { TextObject } from "../model";
 import { textFontFamily } from "../model/text";
 import { MarkdownHtmlCache } from "./markdown-html-cache.ts";
 import { CanvasMarkdownParser } from "./markdown-parser";
+import { markdownBlockCss, markdownTypography } from "./markdown-typography.ts";
 
 export interface MarkdownTextSize {
   width: number;
   height: number;
 }
+export type MarkdownRenderMode = "source" | "rendered";
 
 export class MarkdownTextRenderer {
   private readonly parser: CanvasMarkdownParser;
@@ -17,11 +19,20 @@ export class MarkdownTextRenderer {
 
   constructor(parser?: CanvasMarkdownParser) {
     this.parser =
-      parser ?? new CanvasMarkdownParser((source, unmatched) => this.renderMath(source, unmatched));
+      parser ??
+      new CanvasMarkdownParser((source, unmatched, display) =>
+        this.renderMath(source, unmatched, display),
+      );
     this.htmlCache = new MarkdownHtmlCache(this.parser);
   }
 
-  create(object: TextObject): HTMLText {
+  get revision(): number {
+    return this.htmlCache.revision;
+  }
+
+  create(object: TextObject, mode: MarkdownRenderMode = "rendered"): HTMLText {
+    const rendered = mode === "rendered";
+
     return new HTMLText({
       text: this.htmlForObject(object),
       style: {
@@ -33,8 +44,13 @@ export class MarkdownTextRenderer {
         align: object.textAlign,
         lineHeight: object.lineHeight,
         letterSpacing: object.letterSpacing,
-        wordWrap: false,
-        cssOverrides: this.css(object),
+
+        // Only constrain/wrap using the textbox size in source mode.
+        wordWrap: !rendered && object.sizing === "fixed",
+        wordWrapWidth: Math.max(1, object.width - object.padding * 2),
+        breakWords: !rendered && object.sizing === "fixed",
+
+        cssOverrides: this.css(rendered),
       },
     });
   }
@@ -43,11 +59,19 @@ export class MarkdownTextRenderer {
     return this.htmlCache.htmlFor(source);
   }
 
+  htmlForInline(source: string): string {
+    return this.parser.renderInline(source);
+  }
+
   htmlForObject(object: TextObject): string {
     return this.htmlCache.htmlForObject(object.id, object.text);
   }
 
-  contentKey(object: TextObject): string {
+  htmlForInlineMath(source: string): string {
+    return this.renderMath(source, false);
+  }
+
+  contentKey(object: TextObject, mode: MarkdownRenderMode = "rendered"): string {
     return JSON.stringify([
       object.text,
       object.format,
@@ -59,24 +83,50 @@ export class MarkdownTextRenderer {
       object.textAlign,
       object.lineHeight,
       object.letterSpacing,
+      object.padding,
+      mode,
+
+      // Only source mode depends on the manually chosen textbox dimensions.
+      mode === "source" ? object.sizing : null,
+      mode === "source" ? object.width : null,
+      mode === "source" ? object.minHeight : null,
+
       this.htmlCache.revision,
     ]);
   }
 
-  measure(object: TextObject): MarkdownTextSize {
-    const key = this.contentKey(object);
+  measure(object: TextObject, mode: MarkdownRenderMode = "rendered"): MarkdownTextSize {
+    const key = this.contentKey(object, mode);
     const cached = this.measurements.get(object.id);
-    if (cached?.key === key) return { ...cached.size };
-    const rendered = this.create(object);
-    const size = {
-      width: Math.max(80, Math.ceil(rendered.width + object.padding * 2 + 2)),
-      height: Math.max(
-        Math.ceil(object.lineHeight + object.padding * 2),
-        Math.ceil(rendered.height + object.padding * 2),
-      ),
-    };
+
+    if (cached?.key === key) {
+      return { ...cached.size };
+    }
+
+    const rendered = this.create(object, mode);
+
+    const size =
+      mode === "rendered"
+        ? {
+            width: Math.ceil(rendered.width + object.padding * 2),
+            height: Math.ceil(rendered.height + object.padding * 2),
+          }
+        : {
+            width:
+              object.sizing === "fixed"
+                ? object.width
+                : Math.ceil(rendered.width + object.padding * 2),
+
+            height: Math.max(object.minHeight, Math.ceil(rendered.height + object.padding * 2)),
+          };
+
     rendered.destroy();
-    this.measurements.set(object.id, { key, size });
+
+    this.measurements.set(object.id, {
+      key,
+      size,
+    });
+
     return size;
   }
 
@@ -118,8 +168,10 @@ export class MarkdownTextRenderer {
     };
   }
 
-  private renderMath(source: string, unmatched: boolean): string {
-    const raw = unmatched ? source : `$${source}$`;
+  private renderMath(source: string, unmatched: boolean, display = false, markup?: string): string {
+    const opening = markup ?? (display ? "$$" : "$");
+    const closing = opening === "\\(" ? "\\)" : opening === "\\[" ? "\\]" : opening;
+    const raw = unmatched ? source : `${opening}${source}${closing}`;
     if (unmatched || hasLatexCompileError(source)) {
       return `<span class="canvas-md-math-error">${this.parser.escape(raw)}</span>`;
     }
@@ -129,21 +181,30 @@ export class MarkdownTextRenderer {
       : `<span class="canvas-md-math-pending">${this.parser.escape(raw)}</span>`;
   }
 
-  private css(object: TextObject): string[] {
-    const lineHeight = object.lineHeight / Math.max(object.fontSize, 1);
+  private css(rendered: boolean): string[] {
     return [
-      "p { margin: 0 0 .35em 0; } p:last-child { margin-bottom: 0; }",
-      `h1, h2, h3, h4, h5, h6 { margin: 0 0 .28em 0; line-height: ${lineHeight}; font-weight: 700; }`,
-      "h1 { font-size: 1.7em; } h2 { font-size: 1.45em; } h3 { font-size: 1.25em; }",
-      "ul, ol { margin: 0 0 .35em 0; padding-left: 1.35em; } li { margin: .08em 0; }",
-      "code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: rgba(100,116,139,.13); padding: .08em .25em; border-radius: .22em; }",
-      "pre { margin: 0 0 .35em 0; padding: .55em .7em; background: rgba(100,116,139,.13); border-radius: .35em; white-space: pre; }",
-      "pre code { padding: 0; background: transparent; }",
+      ...markdownBlockCss(),
       ".canvas-md-link { color: #2563eb; text-decoration: underline; }",
       ".canvas-md-math { display: inline-flex; vertical-align: -.15em; }",
       ".canvas-md-math svg { color: currentColor; fill: currentColor; }",
-      ".canvas-md-math-pending { color: #64748b; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }",
-      ".canvas-md-math-error { color: #dc2626; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }",
+
+      `.canvas-md-math-block {
+      display: flex;
+      ${rendered ? "width: max-content; overflow: visible;" : "max-width: 100%; overflow: hidden;"}
+      margin: ${markdownTypography.displayMathMargin};
+    }`,
+
+      `.canvas-md-math-block .canvas-md-math {
+      ${rendered ? "max-width: none;" : "max-width: 100%;"}
+    }`,
+
+      `.canvas-md-math-block svg {
+      ${rendered ? "max-width: none;" : "max-width: 100%;"}
+      height: auto;
+    }`,
+
+      ".canvas-md-math-pending { color: #64748b; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', system-ui, sans-serif; }",
+      ".canvas-md-math-error { color: #dc2626; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', system-ui, sans-serif; }",
     ];
   }
 }

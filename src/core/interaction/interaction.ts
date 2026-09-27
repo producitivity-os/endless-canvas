@@ -1,6 +1,7 @@
 import type { CanvasController } from "../runtime";
 import type { CanvasPoint } from "../types";
 import { KeyboardShortcutMapper } from "./keyboard-shortcut-mapper";
+import { isCanvasUiTarget } from "./canvas-ui-target.ts";
 
 interface SafariGestureEvent extends Event {
   scale: number;
@@ -31,6 +32,7 @@ export class CanvasInteractionController {
     canvas.addEventListener("pointermove", this.onPointerMove);
     canvas.addEventListener("pointerup", this.onPointerUp);
     canvas.addEventListener("pointercancel", this.onPointerUp);
+    canvas.addEventListener("pointerleave", this.onPointerLeave);
     canvas.addEventListener("dblclick", this.onDoubleClick);
     canvas.addEventListener("keydown", this.onKeyDown);
     canvas.addEventListener("wheel", this.onWheel, {
@@ -54,6 +56,7 @@ export class CanvasInteractionController {
     canvas.removeEventListener("pointermove", this.onPointerMove);
     canvas.removeEventListener("pointerup", this.onPointerUp);
     canvas.removeEventListener("pointercancel", this.onPointerUp);
+    canvas.removeEventListener("pointerleave", this.onPointerLeave);
     canvas.removeEventListener("dblclick", this.onDoubleClick);
     canvas.removeEventListener("keydown", this.onKeyDown);
     canvas.removeEventListener("wheel", this.onWheel);
@@ -86,6 +89,10 @@ export class CanvasInteractionController {
     if (this.options.el.hasPointerCapture?.(event.pointerId)) {
       this.options.el.releasePointerCapture(event.pointerId);
     }
+  };
+
+  private onPointerLeave = (): void => {
+    this.options.controller.pointerLeave();
   };
 
   private onDoubleClick = (event: MouseEvent): void => {
@@ -133,15 +140,7 @@ export class CanvasInteractionController {
   }
 
   private isEditableTarget(target: EventTarget | null): boolean {
-    if (!(target instanceof HTMLElement)) {
-      return false;
-    }
-    return (
-      target.isContentEditable ||
-      target instanceof HTMLInputElement ||
-      target instanceof HTMLTextAreaElement ||
-      target instanceof HTMLSelectElement
-    );
+    return isCanvasUiTarget(target);
   }
 
   private onGestureStart = (event: Event): void => {

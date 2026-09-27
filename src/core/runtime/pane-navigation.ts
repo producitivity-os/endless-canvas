@@ -1,7 +1,7 @@
 import { canvasObjectFactory } from "../model/object-factory.ts";
 import type { CanvasCardObject } from "../model/card/card.ts";
 import type { CanvasObject } from "../model/object.ts";
-import { fitCardToContent } from "../engine/card-content-fitter.ts";
+import { expandCardToContent, fitCardToContent } from "../engine/card-content-fitter.ts";
 import type {
   CanvasPaneChangeListener,
   CanvasPaneContext,
@@ -90,7 +90,7 @@ export class CanvasPaneController {
     if (!frame) return false;
     if (frame.dirty) {
       frame.card.elements = this.options.activeState.objects;
-      fitCardToContent(frame.card);
+      expandCardToContent(frame.card);
       this.options.onCardCommit?.(frame.card);
     }
     this.frames.pop();

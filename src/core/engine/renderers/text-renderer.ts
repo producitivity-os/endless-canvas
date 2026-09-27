@@ -17,6 +17,43 @@ interface RetainedTextView {
   objectId: string;
 }
 
+function plainTextStyle(object: TextObject) {
+  return {
+    fill: object.color,
+    fontFamily: textFontFamily(object.fontFamily),
+    fontSize: object.fontSize,
+    fontStyle: object.italic ? ("italic" as const) : ("normal" as const),
+    fontWeight: object.fontWeight(),
+    align: object.textAlign,
+    lineHeight: object.lineHeight,
+    letterSpacing: object.letterSpacing,
+    wordWrap: object.sizing === "fixed",
+    wordWrapWidth: Math.max(1, object.width - object.padding * 2),
+    breakWords: object.sizing === "fixed",
+  };
+}
+
+function textWithinLineLimit(text: string, object: TextObject): boolean {
+  const measurement = new PixiText({ text, style: plainTextStyle(object) });
+  const fits = measurement.height <= object.lineHeight * (object.maxLines ?? 1) + 0.5;
+  measurement.destroy();
+  return fits;
+}
+
+function truncateToMaxLines(text: string, object: TextObject): string {
+  if (!object.maxLines || textWithinLineLimit(text, object)) return text;
+  const source = text.replace(/\s+/g, " ").trim();
+  let low = 0;
+  let high = source.length;
+  while (low < high) {
+    const middle = Math.ceil((low + high) / 2);
+    const candidate = `${source.slice(0, middle).trimEnd()}…`;
+    if (textWithinLineLimit(candidate, object)) low = middle;
+    else high = middle - 1;
+  }
+  return `${source.slice(0, low).trimEnd()}…`;
+}
+
 export class TextRenderer implements ElementRenderer<TextObject> {
   private readonly views = new WeakMap<Container, RetainedTextView>();
 
@@ -72,19 +109,25 @@ export class TextRenderer implements ElementRenderer<TextObject> {
 
   private updateBackground(view: RetainedTextView, object: TextObject): void {
     this.clear(view.background);
-    if (object.highlightColor !== undefined) {
-      view.background.addChild(
-        new Graphics()
-          .rect(0, 0, object.width, object.height)
-          .fill({ color: object.highlightColor }),
-      );
+    const fill = object.backgroundColor ?? object.highlightColor;
+    if (fill === undefined && object.borderColor === undefined) return;
+    const graphics = new Graphics();
+    if (object.cornerRadius > 0) {
+      graphics.roundRect(0, 0, object.width, object.height, object.cornerRadius);
+    } else {
+      graphics.rect(0, 0, object.width, object.height);
     }
+    if (fill !== undefined) graphics.fill({ color: fill });
+    if (object.borderColor !== undefined && object.borderWidth > 0) {
+      graphics.stroke({ color: object.borderColor, width: object.borderWidth });
+    }
+    view.background.addChild(graphics);
   }
 
   private updateContent(view: RetainedTextView, object: TextObject): void {
     const contentKey =
       object.format === "markdown"
-        ? markdownTextRenderer.contentKey(object)
+        ? markdownTextRenderer.contentKey(object, "rendered")
         : JSON.stringify([
             object.text,
             object.color,
@@ -95,6 +138,9 @@ export class TextRenderer implements ElementRenderer<TextObject> {
             object.textAlign,
             object.lineHeight,
             object.letterSpacing,
+            object.sizing,
+            object.width,
+            object.maxLines,
           ]);
     if (view.contentKey !== contentKey || view.format !== object.format) {
       if (view.content) {
@@ -106,20 +152,10 @@ export class TextRenderer implements ElementRenderer<TextObject> {
       }
       view.content =
         object.format === "markdown"
-          ? markdownTextRenderer.create(object)
+          ? markdownTextRenderer.create(object, "rendered")
           : new PixiText({
-              text: object.text,
-              style: {
-                fill: object.color,
-                fontFamily: textFontFamily(object.fontFamily),
-                fontSize: object.fontSize,
-                fontStyle: object.italic ? "italic" : "normal",
-                fontWeight: object.fontWeight(),
-                align: object.textAlign,
-                lineHeight: object.lineHeight,
-                letterSpacing: object.letterSpacing,
-                wordWrap: false,
-              },
+              text: truncateToMaxLines(object.text, object),
+              style: plainTextStyle(object),
             });
       view.contentLayer.addChild(view.content);
       view.contentKey = contentKey;
@@ -187,7 +223,7 @@ export class TextRenderer implements ElementRenderer<TextObject> {
     const chromeScale = 1 / Math.max(context.scale, 0.001);
     view.chrome.addChild(
       new Graphics().rect(0, 0, object.width, object.height).stroke({
-        color: theme.interaction.hoverColor,
+        color: context.interactionColor,
         width: theme.interaction.frameWidth * chromeScale,
       }),
     );

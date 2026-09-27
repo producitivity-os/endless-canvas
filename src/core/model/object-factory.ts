@@ -17,14 +17,23 @@ import {
   type RectangleObjectInit,
 } from "./shapes/index.ts";
 import { TextObject, type TextObjectInit } from "./text/text.ts";
+import { VideoObject, type VideoObjectInit } from "./video/video.ts";
 
 export class CanvasObjectFactory {
+  private readonly hydrators = new Map<string, (object: CanvasObject) => CanvasObject>();
+
+  register(type: string, hydrate: (object: CanvasObject) => CanvasObject): void {
+    this.hydrators.set(type, hydrate);
+  }
+
   hydrate(object: CanvasObject): CanvasObject {
     if (typeof object.bounds === "function") {
       return object;
     }
 
     const type = (object as { type: CanvasObjectType }).type;
+    const customHydrator = this.hydrators.get(type);
+    if (customHydrator) return customHydrator(object);
     switch (type) {
       case "card": {
         const card = object as unknown as CanvasCardInit;
@@ -51,6 +60,8 @@ export class CanvasObjectFactory {
         return new ArrowObject(object as unknown as ArrowObjectInit);
       case "text":
         return new TextObject(object as unknown as TextObjectInit);
+      case "video":
+        return new VideoObject(object as unknown as VideoObjectInit);
       default:
         throw new Error(`Unknown canvas object type: ${String(type)}`);
     }

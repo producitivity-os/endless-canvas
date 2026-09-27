@@ -8,6 +8,7 @@ import {
   TextObject,
   type TextFormat,
   TextCard,
+  MarkdownCard,
   type CanvasObject,
 } from "../model";
 import { CanvasPropertyDefaults } from "../properties";
@@ -16,6 +17,7 @@ import type { CanvasCreationPreview, CanvasPoint, CanvasTool } from "../types";
 export type CanvasCreationTool = Extract<
   CanvasTool,
   | "card"
+  | "markdown-card"
   | "text"
   | "markdown"
   | "rect"
@@ -72,6 +74,7 @@ export class CanvasCreationSession {
 
     if (
       tool === "card" ||
+      tool === "markdown-card" ||
       tool === "text" ||
       tool === "markdown" ||
       tool === "rect" ||
@@ -121,30 +124,40 @@ export class CanvasCreationSession {
   private createBox(
     tool: Extract<
       CanvasCreationTool,
-      "card" | "text" | "markdown" | "rect" | "ellipse" | "diamond" | "pentagon" | "parallelogram"
+      | "card"
+      | "markdown-card"
+      | "text"
+      | "markdown"
+      | "rect"
+      | "ellipse"
+      | "diamond"
+      | "pentagon"
+      | "parallelogram"
     >,
     start: CanvasPoint,
     end: CanvasPoint,
   ): CanvasObject {
     const minimum =
-      tool === "card"
+      tool === "card" || tool === "markdown-card"
         ? { width: 80, height: 60 }
         : this.isTextTool(tool)
           ? { width: 80, height: 33 }
           : { width: 48, height: 36 };
     const draggedWidth = Math.abs(end.x - start.x);
     const draggedHeight = Math.abs(end.y - start.y);
+    const cardTool = tool === "card" || tool === "markdown-card";
+    const defaultsTool = tool === "markdown-card" ? "card" : tool;
     const width =
       draggedWidth < 2
-        ? tool === "card"
+        ? cardTool
           ? 220
           : this.isTextTool(tool)
-            ? 80
+            ? 240
             : 140
         : Math.max(minimum.width, draggedWidth);
     const height =
       draggedHeight < 2
-        ? tool === "card"
+        ? cardTool
           ? 140
           : this.isTextTool(tool)
             ? 33
@@ -159,11 +172,11 @@ export class CanvasCreationSession {
       width,
       height,
       rotation: 0,
-      opacity: this.defaults.forTool(tool).opacity ?? 1,
-      fill: this.defaults.forTool(tool).fill ?? 0xffffff,
-      stroke: this.defaults.forTool(tool).stroke ?? 0x64748b,
-      strokeWidth: this.defaults.forTool(tool).strokeWidth ?? 2,
-      fillStyle: this.defaults.forTool(tool).fillStyle ?? ("solid" as const),
+      opacity: this.defaults.forTool(defaultsTool).opacity ?? 1,
+      fill: this.defaults.forTool(defaultsTool).fill ?? 0xffffff,
+      stroke: this.defaults.forTool(defaultsTool).stroke ?? 0x64748b,
+      strokeWidth: this.defaults.forTool(defaultsTool).strokeWidth ?? 2,
+      fillStyle: this.defaults.forTool(defaultsTool).fillStyle ?? ("solid" as const),
     };
 
     if (this.isTextTool(tool)) {
@@ -188,10 +201,25 @@ export class CanvasCreationSession {
         verticalAlign: values.verticalAlign,
         lineHeight: values.lineHeight,
         letterSpacing: values.letterSpacing,
+        sizing: "fixed",
+        minHeight: height,
+        backgroundColor: undefined,
+        borderColor: undefined,
+        borderWidth: 0,
+        cornerRadius: 0,
       });
     }
 
-    if (tool === "card") {
+    if (tool === "card" || tool === "markdown-card") {
+      if (tool === "markdown-card") {
+        return new MarkdownCard({
+          ...common,
+          type: "card",
+          elements: [],
+          markdown: "",
+          backgroundColor: this.defaults.forTool("card").backgroundColor,
+        });
+      }
       return new TextCard({
         ...common,
         type: "card",

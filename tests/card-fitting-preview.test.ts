@@ -1,16 +1,20 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { Texture } from "pixi.js";
+import { Container, type Texture } from "pixi.js";
 import { ArrowObject } from "../src/core/model/arrow/arrow.ts";
-import { TextCard } from "../src/core/model/card/card.ts";
+import { IllustrationCard, TextCard } from "../src/core/model/card/card.ts";
 import { PathObject } from "../src/core/model/shapes/path.ts";
 import { RectangleObject } from "../src/core/model/shapes/rectangle.ts";
 import { canvasObjectFactory } from "../src/core/model/object-factory.ts";
-import { fitCardToContent } from "../src/core/engine/card-content-fitter.ts";
+import { expandCardToContent, fitCardToContent } from "../src/core/engine/card-content-fitter.ts";
 import { canvasVisualBounds } from "../src/core/engine/visual-bounds.ts";
 import { CardPreviewCache } from "../src/core/engine/renderers/card-preview-cache.ts";
 import { minCardHeight, minCardWidth } from "../src/core/engine/utils.ts";
 import type { CanvasObject } from "../src/core/model/object.ts";
+import { cardPresentation } from "../src/core/engine/renderers/card-presentation.ts";
+import { cardBorderGeometry } from "../src/core/engine/renderers/card-border-geometry.ts";
+import { markdownCardLayout } from "../src/core/engine/renderers/markdown-card-layout.ts";
+import { TextObject } from "../src/core/model/text/text.ts";
 
 function rectangle(id: string, x: number, y: number, rotation = 0): RectangleObject {
   return new RectangleObject({
@@ -133,6 +137,23 @@ test("fitting includes path strokes, curved arrows, arrowheads, and nested cards
   assert.ok(bounds.y + bounds.height <= value.height - 5.99);
 });
 
+test("automatic card expansion preserves its drawn size and only grows for overflow", () => {
+  const inside = card("inside", [rectangle("inside-shape", 40, 40)]);
+  const original = inside.bounds();
+  assert.equal(expandCardToContent(inside), false);
+  assert.deepEqual(inside.bounds(), original);
+
+  const overflow = card("overflow", [rectangle("outside-shape", 250, 170)]);
+  assert.equal(expandCardToContent(overflow), true);
+  assert.ok(overflow.width > original.width);
+  assert.ok(overflow.height > original.height);
+
+  const empty = card("empty-grow", []);
+  assert.equal(expandCardToContent(empty), false);
+  assert.equal(empty.width, 260);
+  assert.equal(empty.height, 180);
+});
+
 test("preview cache builds nested cards bottom-up, reuses snapshots, and disposes them", () => {
   const generated: string[][] = [];
   let current: string[] = [];
@@ -167,13 +188,58 @@ test("preview cache builds nested cards bottom-up, reuses snapshots, and dispose
   assert.equal(destroys, 4);
 });
 
+test("canvas cards containing Markdown use live previews so resolved LaTeX can render", () => {
+  const rendered: string[] = [];
+  const cache = new CardPreviewCache({
+    generateTexture: () => ({ destroy: () => undefined }) as unknown as Texture,
+    renderElement: (_target, element) => rendered.push(element.id),
+    renderArrow: () => undefined,
+  });
+  const markdown = new TextObject({
+    id: "formula",
+    type: "text",
+    x: 12,
+    y: 12,
+    width: 220,
+    height: 100,
+    rotation: 0,
+    opacity: 1,
+    text: "$x^2 + y^2 = r^2$",
+    format: "markdown",
+  });
+  const value = card("formula-card", [markdown]);
+  assert.equal(cache.needsLivePreview(value), true);
+  const target = new Container();
+  cache.renderLive(target, value);
+  assert.deepEqual(rendered, ["formula"]);
+  target.destroy({ children: true });
+});
+
 test("nested card serialization contains model data only and hydrates recursively", () => {
   const nested = card("nested", [rectangle("shape", 4, 5)]);
   const root = card("root", [nested]);
   const serialized = JSON.stringify({ objects: [root] });
   assert.doesNotMatch(serialized, /texture|preview/i);
   const parsed = JSON.parse(serialized) as { objects: CanvasObject[] };
-  const hydrated = canvasObjectFactory.hydrate(parsed.objects[0]) as TextCard;
-  assert.equal(hydrated.elements[0] instanceof TextCard, true);
-  assert.equal((hydrated.elements[0] as TextCard).elements[0] instanceof RectangleObject, true);
+  const hydrated = canvasObjectFactory.hydrate(parsed.objects[0]) as IllustrationCard;
+  assert.equal(hydrated.elements[0] instanceof IllustrationCard, true);
+  assert.equal(
+    (hydrated.elements[0] as IllustrationCard).elements[0] instanceof RectangleObject,
+    true,
+  );
+});
+
+test("editing a markdown card hides its rendered preview", () => {
+  assert.equal(cardPresentation.showsPreview(true), false);
+  assert.equal(cardPresentation.showsPreview(false), true);
+});
+
+test("cards keep a fixed border radius and markdown content uses balanced padding", () => {
+  assert.equal(cardBorderGeometry.radiusFor(240, 120), 14);
+  assert.equal(cardBorderGeometry.radiusFor(480, 240), 14);
+  assert.equal(cardBorderGeometry.radiusFor(16, 12), 6);
+  assert.equal(markdownCardLayout.contentWidth(200), 164);
+  assert.equal(markdownCardLayout.bottomPadding, 18);
+  assert.equal(markdownCardLayout.cardHeight(44), 80);
+  assert.equal(markdownCardLayout.contentHeight(80), 44);
 });

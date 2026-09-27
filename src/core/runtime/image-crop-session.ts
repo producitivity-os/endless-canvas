@@ -1,6 +1,7 @@
 import { boxGeometry } from "../engine/box-geometry.ts";
 import type { CanvasImageCrop, ImageObject } from "../model";
 import type { CanvasImageCropPreview, CanvasPoint } from "../types";
+import { selectionHandles } from "../engine/renderers/selection-handles.ts";
 
 type CropHandle = "topLeft" | "topRight" | "bottomRight" | "bottomLeft";
 
@@ -108,6 +109,14 @@ export class CanvasImageCropSession {
 
   endDrag(): void {
     this.drag = null;
+  }
+
+  cursorAt(point: CanvasPoint, scale: number): string {
+    const local = this.worldToLocal(point);
+    const handle = this.drag?.handle ?? this.hitHandle(local, scale);
+    if (handle) return selectionHandles.cursor(handle, this.image.rotation);
+    if (this.drag?.type === "move" || this.contains(this.frame, local)) return "move";
+    return this.contains(this.source, local) ? "crosshair" : "default";
   }
 
   containsSource(point: CanvasPoint): boolean {

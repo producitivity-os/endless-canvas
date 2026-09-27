@@ -28,6 +28,8 @@ export function cloneElementArrows(arrows: ArrowObject[]): ArrowObject[] {
         height: arrow.height,
         rotation: arrow.rotation,
         opacity: arrow.opacity,
+        name: arrow.name,
+        description: arrow.description,
         start: {
           point: { ...arrow.start.point },
           binding: arrow.start.binding

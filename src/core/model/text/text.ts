@@ -4,6 +4,7 @@ export type TextFont = "inter" | "serif" | "mono" | "rounded";
 export type TextVariant = "body" | "heading" | "caption" | "latex";
 export type TextWeight = "regular" | "bold" | "extrabold";
 export type TextFormat = "plain" | "markdown";
+export type TextSizing = "auto" | "fixed";
 
 export type TextObjectInit = CanvasObjectInit & {
   text?: string;
@@ -23,8 +24,17 @@ export type TextObjectInit = CanvasObjectInit & {
   underline?: boolean;
   highlightColor?: number;
   lineHeight?: number;
+  maxLines?: number;
   letterSpacing?: number;
   format?: TextFormat;
+  sizing?: TextSizing;
+  minHeight?: number;
+  sourceWidth?: number;
+  sourceHeight?: number;
+  backgroundColor?: number;
+  borderColor?: number;
+  borderWidth?: number;
+  cornerRadius?: number;
 };
 
 export class BaseTextObject extends CanvasObject {
@@ -45,8 +55,17 @@ export class BaseTextObject extends CanvasObject {
   underline: boolean;
   highlightColor?: number;
   lineHeight: number;
+  maxLines?: number;
   letterSpacing: number;
   format: TextFormat;
+  sizing: TextSizing;
+  minHeight: number;
+  sourceWidth?: number;
+  sourceHeight?: number;
+  backgroundColor?: number;
+  borderColor?: number;
+  borderWidth: number;
+  cornerRadius: number;
 
   constructor(init: TextObjectInit) {
     super(init);
@@ -66,8 +85,17 @@ export class BaseTextObject extends CanvasObject {
     this.underline = init.underline ?? false;
     this.highlightColor = init.highlightColor;
     this.lineHeight = init.lineHeight ?? Math.round(this.fontSize * 1.35);
+    this.maxLines = init.maxLines && init.maxLines > 0 ? Math.floor(init.maxLines) : undefined;
     this.letterSpacing = init.letterSpacing ?? 0;
     this.format = init.format ?? "plain";
+    this.sizing = init.sizing ?? "auto";
+    this.minHeight = init.minHeight ?? init.height;
+    this.sourceWidth = init.sourceWidth ?? (this.format === "markdown" ? init.width : undefined);
+    this.sourceHeight = init.sourceHeight ?? (this.format === "markdown" ? init.height : undefined);
+    this.backgroundColor = init.backgroundColor;
+    this.borderColor = init.borderColor;
+    this.borderWidth = init.borderWidth ?? 0;
+    this.cornerRadius = init.cornerRadius ?? 0;
     this.id = init.id;
   }
 

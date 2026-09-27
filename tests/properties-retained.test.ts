@@ -33,6 +33,7 @@ function rectangle(id: string, fill = 0xffffff) {
 
 test("tool defaults are validated and retained per creation tool", () => {
   const defaults = new CanvasPropertyDefaults();
+  assert.equal(defaults.forTool("image").cornerRadius, 0);
   assert.equal(defaults.apply("text", { format: "markdown", fontSize: 26 }), 2);
   assert.equal(defaults.apply("text", { fontSize: Number.NaN }), 0);
   assert.equal(defaults.forTool("text").format, "markdown");
@@ -134,17 +135,30 @@ test("Markdown parsing is retained and object caches are cleaned after deletion"
   assert.equal(parses, 4);
 });
 
-test("image labels stay eight screen pixels beyond ten-pixel corner handles", () => {
+test("image labels shrink below 100%, cap above it, and stay anchored to image corners", () => {
   const renderer = new ImageLabelRenderer();
   for (const scale of [0.25, 1, 3]) {
     const frame = { x: -2 / scale, y: -2 / scale, width: 200 + 4 / scale, height: 100 + 4 / scale };
     const handles = { x: 0, y: 0, width: 200, height: 100 };
-    const placements = renderer.placements(frame, handles, scale);
-    assert.ok(Math.abs((placements.size.x - handles.x) * scale - 5 - 8) < 0.000001);
+    const layout = renderer.layout(frame, handles, scale);
+    const expectedScreenScale = Math.min(1, scale);
+    assert.equal(layout.screenScale, expectedScreenScale);
+    assert.equal(layout.worldScale, expectedScreenScale / scale);
     assert.ok(
-      Math.abs((handles.x + handles.width - placements.filename.x) * scale - 5 - 8) < 0.000001,
+      Math.abs((handles.x + handles.width - layout.size.x) * scale - 13 * expectedScreenScale) < 0.000001,
     );
-    assert.equal(placements.size.y, frame.y + frame.height);
-    assert.equal(placements.filename.y, frame.y);
+    assert.ok(
+      Math.abs((layout.filename.x - handles.x) * scale - 13 * expectedScreenScale) < 0.000001,
+    );
+    assert.equal(layout.size.y, frame.y);
+    assert.equal(layout.filename.y, frame.y + frame.height);
   }
+});
+
+test("image labels hide when the projected image is too small", () => {
+  const renderer = new ImageLabelRenderer();
+  const handles = { x: 0, y: 0, width: 320, height: 59 };
+  assert.equal(renderer.layout(handles, handles, 0.7).visible, false);
+  assert.equal(renderer.layout(handles, handles, 0.75).visible, true);
+  assert.equal(renderer.layout({ ...handles, width: 120 }, handles, 0.75).visible, false);
 });

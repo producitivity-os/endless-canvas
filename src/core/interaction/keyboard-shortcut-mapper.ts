@@ -1,5 +1,13 @@
 export type KeyboardShortcutAction =
-  "delete-selection" | "select-all" | "cancel" | "commit-interaction";
+  | "delete-selection"
+  | "select-all"
+  | "copy-selection"
+  | "cut-selection"
+  | "paste"
+  | "undo"
+  | "redo"
+  | "cancel"
+  | "commit-interaction";
 
 export interface KeyboardShortcutDefinition {
   action: KeyboardShortcutAction;
@@ -10,6 +18,11 @@ export interface KeyboardShortcutDefinition {
 export const defaultKeyboardShortcuts: readonly KeyboardShortcutDefinition[] = [
   { action: "delete-selection", keys: ["Backspace", "Delete"] },
   { action: "select-all", keys: ["a"], primaryModifier: true },
+  { action: "copy-selection", keys: ["c"], primaryModifier: true },
+  { action: "cut-selection", keys: ["x"], primaryModifier: true },
+  { action: "paste", keys: ["v"], primaryModifier: true },
+  { action: "undo", keys: ["z"], primaryModifier: true },
+  { action: "redo", keys: ["u"], primaryModifier: true },
   { action: "cancel", keys: ["Escape"] },
   { action: "commit-interaction", keys: ["Enter"] },
 ];

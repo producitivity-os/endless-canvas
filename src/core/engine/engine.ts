@@ -13,12 +13,29 @@ import type {
   CanvasObject,
   CanvasObjectType,
   TextObject,
+  CardTemplateProvider,
+  CanvasPluginCardProvider,
 } from "../model";
 import type { CanvasRenderContext, ElementRenderer } from "./renderers/renderer";
 import { OverlayRenderer } from "./renderers/overlay-renderer";
 import { RetainedViewLayer } from "./renderers/retained-view-layer";
 import { markdownTextRenderer } from "../markdown";
 import { CardPreviewCache } from "./renderers/card-preview-cache";
+import { VideoRenderer } from "./renderers/video-renderer";
+import { orderedCanvasLayers, visibleCanvasObjects, type CanvasLayer } from "../model";
+import { normalizeInteractionColor } from "../model/layers";
+import type { CanvasObjectExtension } from "../types/extensions.ts";
+import { PermanentConnectionHandleRenderer } from "./renderers/permanent-connection-handle-renderer.ts";
+
+interface RenderLayer {
+  root: Container;
+  under: Container;
+  objects: Container;
+  over: Container;
+  objectViews: RetainedViewLayer<CanvasObject>;
+  underArrowViews: RetainedViewLayer<ArrowObject>;
+  overArrowViews: RetainedViewLayer<ArrowObject>;
+}
 
 export class ElementRendererRegistry {
   private readonly renderers = new Map<CanvasObjectType, ElementRenderer<CanvasObject>>();
@@ -72,23 +89,40 @@ export class CanvasEngine {
 
   readonly gridLayer = new Graphics();
   readonly viewport = new Container();
-  readonly underArrowLayer = new Container();
-  readonly objectLayer = new Container();
-  readonly overArrowLayer = new Container();
+  readonly canvasLayers = new Container();
   readonly previewLayer = new Graphics();
   readonly overlayLayer = new Container();
   private readonly renderers = new ElementRendererRegistry();
   private readonly arrowRenderer = new ArrowRenderer();
-  private readonly overlayRenderer = new OverlayRenderer();
-  private readonly objectViews = new RetainedViewLayer<CanvasObject>((container, object) =>
-    this.renderers.dispose(container, object),
-  );
-  private readonly underArrowViews = new RetainedViewLayer<ArrowObject>();
-  private readonly overArrowViews = new RetainedViewLayer<ArrowObject>();
+  private readonly videoRenderer = new VideoRenderer();
+  private readonly overlayRenderer: OverlayRenderer;
+  private readonly permanentConnectionHandles: PermanentConnectionHandleRenderer;
+  private readonly objectBodies = new WeakMap<Container, Container>();
+  private readonly layerViews = new Map<string, RenderLayer>();
   private cardPreviews: CardPreviewCache | null = null;
   detailViewport: Container | null = null;
   detailGrid: Graphics | null = null;
   private initialized = false;
+  private destroyed = false;
+
+  private readonly extensions: readonly CanvasObjectExtension<any>[];
+  private readonly cardTemplates?: CardTemplateProvider;
+  private readonly pluginCards?: CanvasPluginCardProvider;
+  private readonly gridStyle: CanvasGridStyle;
+
+  constructor(
+    extensions: readonly CanvasObjectExtension<any>[] = [],
+    cardTemplates?: CardTemplateProvider,
+    pluginCards?: CanvasPluginCardProvider,
+    gridStyle: CanvasGridStyle = "lines",
+  ) {
+    this.extensions = extensions;
+    this.cardTemplates = cardTemplates;
+    this.pluginCards = pluginCards;
+    this.gridStyle = gridStyle;
+    this.overlayRenderer = new OverlayRenderer(extensions, pluginCards);
+    this.permanentConnectionHandles = new PermanentConnectionHandleRenderer(extensions);
+  }
 
   get canvas(): HTMLCanvasElement {
     return this.app.canvas;
@@ -122,7 +156,10 @@ export class CanvasEngine {
       renderArrow: (target, arrow, objects, context) =>
         this.arrowRenderer.render(target, arrow, objects, context),
     });
-    this.renderers.register("card", new CardRenderer(this.cardPreviews));
+    this.renderers.register(
+      "card",
+      new CardRenderer(this.cardPreviews, this.cardTemplates, this.pluginCards),
+    );
     const shapeRenderer = new ShapeRenderer();
     this.renderers.register("rect", shapeRenderer);
     this.renderers.register("ellipse", shapeRenderer);
@@ -131,7 +168,12 @@ export class CanvasEngine {
     this.renderers.register("parallelogram", shapeRenderer);
     this.renderers.register("image", new ImageRenderer());
     this.renderers.register("text", new TextRenderer());
+    this.renderers.register("video", this.videoRenderer);
     this.renderers.register("path", new PathRenderer());
+    for (const extension of this.extensions) {
+      const renderer = extension.createRenderer?.();
+      if (renderer) this.renderers.register(extension.type, renderer);
+    }
 
     this.canvas.className = "pixi-canvas";
     this.canvas.tabIndex = 0;
@@ -139,20 +181,13 @@ export class CanvasEngine {
     this.app.stage.eventMode = "static";
     this.app.stage.hitArea = this.app.screen;
     this.viewport.sortableChildren = true;
-    this.underArrowLayer.zIndex = 20;
-    this.objectLayer.zIndex = 25;
-    this.overArrowLayer.zIndex = 27;
+    this.canvasLayers.zIndex = 20;
+    this.canvasLayers.sortableChildren = true;
     this.previewLayer.zIndex = 30;
     this.overlayLayer.zIndex = 40;
 
     this.app.stage.addChild(this.gridLayer, this.viewport);
-    this.viewport.addChild(
-      this.underArrowLayer,
-      this.objectLayer,
-      this.overArrowLayer,
-      this.previewLayer,
-      this.overlayLayer,
-    );
+    this.viewport.addChild(this.canvasLayers, this.previewLayer, this.overlayLayer);
 
     host.prepend(this.canvas);
 
@@ -176,25 +211,39 @@ export class CanvasEngine {
   }
 
   clearBoard(): void {
-    this.underArrowViews.clear();
-    this.objectViews.clear();
-    this.overArrowViews.clear();
+    for (const layer of this.layerViews.values()) {
+      layer.underArrowViews.clear();
+      layer.objectViews.clear();
+      layer.overArrowViews.clear();
+      layer.root.destroy({ children: true });
+    }
+    this.layerViews.clear();
     this.previewLayer.clear();
     this.clearContainer(this.overlayLayer);
   }
 
+  resize(): void {
+    if (!this.initialized || this.destroyed) return;
+    this.app.resize();
+    this.app.stage.hitArea = this.app.screen;
+  }
+
   destroy(): void {
-    if (!this.initialized) {
+    if (!this.initialized || this.destroyed) {
       return;
     }
 
+    this.destroyed = true;
     this.clearBoard();
+    this.videoRenderer.destroy();
     this.cardPreviews?.destroy();
     this.cardPreviews = null;
-    markdownTextRenderer.destroy();
-    this.app.destroy(true, {
-      children: true,
-    });
+    this.app.destroy(
+      { removeView: true, releaseGlobalResources: false },
+      {
+        children: true,
+      },
+    );
 
     this.initialized = false;
   }
@@ -204,34 +253,22 @@ export class CanvasEngine {
     runtime: EndlessCanvasRuntimeState,
     documentObjects: readonly CanvasObject[] = state.objects,
   ): void {
+    if (!this.initialized || this.destroyed) return;
     this.cardPreviews?.prune([...documentObjects, ...state.objects]);
-    this.drawGrid(this.app.screen.width, this.app.screen.height);
+    this.drawGrid(this.app.screen.width, this.app.screen.height, 32, this.gridStyle);
 
-    this.renderArrows(this.underArrowLayer, state, runtime, "under");
-
-    const objects = state.objects.filter((object) => object.type !== "arrow");
-    this.objectViews.reconcile(
-      this.objectLayer,
-      objects,
-      (object) => object.id,
-      (target, object) => {
-        this.renderers.reconcile(target, object, {
-          scale: this.viewport.scale.x,
-          hovered: runtime.hoveredObjectId === object.id,
-          selected: runtime.selection.isSelected(object.id),
-          editing: runtime.editingTextId === object.id,
-          imageCrop: runtime.imageCrop?.imageId === object.id ? runtime.imageCrop : undefined,
-        });
-      },
-    );
+    this.reconcileLayers(orderedCanvasLayers(state), state, runtime);
 
     markdownTextRenderer.prune(this.collectMarkdownIds([...documentObjects, ...state.objects]));
 
-    this.renderArrows(this.overArrowLayer, state, runtime, "over");
-
     this.previewLayer.clear();
     this.clearContainer(this.overlayLayer);
-    this.overlayRenderer.render(this.overlayLayer, state, runtime, this.viewport.scale.x);
+    this.overlayRenderer.render(
+      this.overlayLayer,
+      { ...state, objects: visibleCanvasObjects(state) },
+      runtime,
+      this.viewport.scale.x,
+    );
   }
 
   invalidateCardPreview(cardId: string): void {
@@ -242,31 +279,139 @@ export class CanvasEngine {
     return this.cardPreviews?.generationCount() ?? 0;
   }
 
-  private renderArrows(
-    target: Container,
+  private reconcileLayers(
+    layers: readonly CanvasLayer[],
     state: EndlessCanvasState,
     runtime: EndlessCanvasRuntimeState,
-    layer: "under" | "over",
   ): void {
-    const arrows = state.objects.filter((object): object is ArrowObject => {
+    const valid = new Set(layers.map((layer) => layer.id));
+    for (const [id, view] of this.layerViews) {
+      if (valid.has(id)) continue;
+      view.underArrowViews.clear();
+      view.objectViews.clear();
+      view.overArrowViews.clear();
+      view.root.destroy({ children: true });
+      this.layerViews.delete(id);
+    }
+
+    for (const layer of layers) {
+      const view = this.layerView(layer.id);
+      view.root.zIndex = layer.zIndex;
+      view.root.visible = layer.visible;
+      view.root.alpha =
+        layer.opacity *
+        (state.focusedLayerId && state.focusedLayerId !== layer.id
+          ? (state.unfocusedLayerOpacity ?? 0.24)
+          : 1);
+
+      const layerObjects = state.objects.filter((object) => object.layerId === layer.id);
+      this.renderArrows(
+        view,
+        layerObjects,
+        state.objects,
+        runtime,
+        "under",
+        layer.interactionColor,
+      );
+      view.objectViews.reconcile(
+        view.objects,
+        layerObjects.filter((object) => object.type !== "arrow"),
+        (object) => object.id,
+        (target, object) => {
+          let body = this.objectBodies.get(target);
+          if (!body) {
+            body = new Container();
+            this.objectBodies.set(target, body);
+            target.addChild(body);
+          }
+          this.renderers.reconcile(body, object, {
+            scale: this.viewport.scale.x,
+            hovered: runtime.hoveredObjectId === object.id,
+            hoveredRegionId:
+              runtime.hoveredInteractionObjectId === object.id
+                ? (runtime.hoveredInteractionRegionId ?? undefined)
+                : undefined,
+            selected: runtime.selection.isSelected(object.id),
+            interactionColor: normalizeInteractionColor(layer.interactionColor),
+            editing: runtime.editingTextId === object.id,
+            imageCrop: runtime.imageCrop?.imageId === object.id ? runtime.imageCrop : undefined,
+          });
+          this.permanentConnectionHandles.render(
+            target,
+            object,
+            runtime,
+            this.viewport.scale.x,
+            normalizeInteractionColor(layer.interactionColor),
+          );
+        },
+      );
+      this.renderArrows(view, layerObjects, state.objects, runtime, "over", layer.interactionColor);
+    }
+  }
+
+  private renderArrows(
+    view: RenderLayer,
+    layerObjects: readonly CanvasObject[],
+    documentObjects: readonly CanvasObject[],
+    runtime: EndlessCanvasRuntimeState,
+    mode: "under" | "over",
+    interactionColor?: number,
+  ): void {
+    const arrows = layerObjects.filter((object): object is ArrowObject => {
       if (object.type !== "arrow") return false;
       const arrow = object as ArrowObject;
-      return (arrow.renderMode === "under" ? "under" : "over") === layer;
+      return (arrow.renderMode === "under" ? "under" : "over") === mode;
     });
-    const views = layer === "under" ? this.underArrowViews : this.overArrowViews;
+    const views = mode === "under" ? view.underArrowViews : view.overArrowViews;
+    const target = mode === "under" ? view.under : view.over;
     views.reconcile(
       target,
       arrows,
       (arrow) => arrow.id,
       (view, arrow) => {
         this.clearContainer(view);
-        this.arrowRenderer.render(view, arrow, state.objects, {
+        this.arrowRenderer.render(view, arrow, documentObjects, {
           scale: this.viewport.scale.x,
           hovered: runtime.hoveredObjectId === arrow.id,
+          hoveredRegionId:
+            runtime.hoveredInteractionObjectId === arrow.id
+              ? (runtime.hoveredInteractionRegionId ?? undefined)
+              : undefined,
           selected: runtime.selection.isSelected(arrow.id),
+          interactionColor: normalizeInteractionColor(interactionColor),
         });
       },
     );
+  }
+
+  private layerView(id: string): RenderLayer {
+    const existing = this.layerViews.get(id);
+    if (existing) return existing;
+    const root = new Container();
+    const under = new Container();
+    const objects = new Container();
+    const over = new Container();
+    root.sortableChildren = true;
+    under.zIndex = 0;
+    objects.zIndex = 1;
+    over.zIndex = 2;
+    root.addChild(under, objects, over);
+    this.canvasLayers.addChild(root);
+    const created: RenderLayer = {
+      root,
+      under,
+      objects,
+      over,
+      objectViews: new RetainedViewLayer<CanvasObject>((container, object) => {
+        this.renderers.dispose(this.objectBodies.get(container) ?? container, object);
+        this.permanentConnectionHandles.dispose(container);
+        this.objectBodies.delete(container);
+      }),
+      underArrowViews: new RetainedViewLayer<ArrowObject>(),
+      overArrowViews: new RetainedViewLayer<ArrowObject>(),
+    };
+    this.layerViews.set(id, created);
+    return created;
   }
 
   drawGrid(
@@ -292,14 +437,22 @@ export class CanvasEngine {
       return;
     }
 
-    const color = theme === "dark" ? 0x454a56 : 0xdfe4ec;
+    const color = theme === "dark" ? 0x505664 : 0xcbd2dc;
 
     if (style === "dots") {
-      for (let x = offsetX; x < width; x += step) {
-        for (let y = offsetY; y < height; y += step) {
-          grid.circle(x, y, 1.25).fill({
+      // A half-step horizontal shear produces the familiar 30-degree
+      // isometric lattice while preserving the canvas' world-space origin.
+      const rowStep = (step * Math.sqrt(3)) / 2;
+      const firstRow = Math.floor(-viewport.y / rowStep) - 1;
+      const lastRow = Math.ceil((height - viewport.y) / rowStep) + 1;
+      for (let row = firstRow; row <= lastRow; row += 1) {
+        const y = viewport.y + row * rowStep;
+        const skewedOrigin = viewport.x + (row * step) / 2;
+        const firstX = ((skewedOrigin % step) + step) % step;
+        for (let x = firstX; x < width; x += step) {
+          grid.circle(x, y, 1.5).fill({
             color,
-            alpha: opacity,
+            alpha: Math.max(opacity * 0.72, 0.52),
           });
         }
       }

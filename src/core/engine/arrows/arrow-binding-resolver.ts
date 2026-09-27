@@ -32,6 +32,7 @@ export class ArrowBindingResolver {
     point: CanvasPoint,
     objects: readonly CanvasObject[],
     snapDistance: number,
+    customHints?: (object: CanvasObject) => ReturnType<ArrowBindingResolver["hints"]> | null,
   ): ArrowSnapResult {
     const host =
       this.topmostHost(objects, point) ?? this.hostNearHint(objects, point, snapDistance);
@@ -39,7 +40,8 @@ export class ArrowBindingResolver {
       return { endpoint: { point: { ...point } }, object: null, hotHint: null };
     }
 
-    const hints = this.hints(host);
+    const custom = customHints?.(host) ?? null;
+    const hints = custom ?? this.hints(host);
     const nearest = hints.reduce<(typeof hints)[number] | null>((result, candidate) => {
       if (!result) return candidate;
       return this.distance(point, candidate.point) < this.distance(point, result.point)
@@ -59,6 +61,10 @@ export class ArrowBindingResolver {
         object: host,
         hotHint: nearest.hint,
       };
+    }
+
+    if (custom) {
+      return { endpoint: { point: { ...point } }, object: null, hotHint: null };
     }
 
     const anchor = this.anchorForPoint(host, point);
@@ -83,7 +89,7 @@ export class ArrowBindingResolver {
   }
 
   canBind(object: CanvasObject): boolean {
-    return object.type !== "arrow" && object.type !== "path";
+    return object.type !== "arrow" && object.type !== "path" && object.capabilities.connectable;
   }
 
   contains(object: CanvasObject, point: CanvasPoint): boolean {
@@ -108,6 +114,44 @@ export class ArrowBindingResolver {
       ...candidate,
       point: this.outlinePoint(object, candidate.hint),
     }));
+  }
+
+  hintsFrom(
+    object: CanvasObject,
+    handles: readonly {
+      hint: ArrowHint;
+      anchor: CanvasPoint;
+      direction?: "input" | "output" | "both";
+      shape?: "circle" | "rounded-rectangle";
+    }[],
+  ): Array<{
+    hint: ArrowHint;
+    point: CanvasPoint;
+    anchor: CanvasPoint;
+    direction?: "input" | "output" | "both";
+    shape?: "circle" | "rounded-rectangle";
+  }> {
+    return handles.map((handle) => ({
+      ...handle,
+      anchor: { ...handle.anchor },
+      point: this.pointForAnchor(object, handle.anchor),
+    }));
+  }
+
+  hintForEndpoint(endpoint: ArrowEndpoint, object: CanvasObject): ArrowHint {
+    if (endpoint.binding?.hint) return endpoint.binding.hint;
+    const hints = this.hints(object);
+    const bindingPoint = endpoint.binding
+      ? this.pointForAnchor(object, endpoint.binding.anchor)
+      : endpoint.point;
+    const target = this.distance(endpoint.point, bindingPoint) > 0.001
+      ? endpoint.point
+      : bindingPoint;
+    return hints.reduce((nearest, candidate) =>
+      this.distance(target, candidate.point) < this.distance(target, nearest.point)
+        ? candidate
+        : nearest,
+    ).hint;
   }
 
   detachMissingBindings(arrows: readonly ArrowEndpoint[], objects: readonly CanvasObject[]): void {
